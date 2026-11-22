@@ -216,28 +216,6 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           </button>
         </div>
 
-        {/* Acciones de Playlist (Cargar y Guardar) para Programador y Admin */}
-        {(isAdmin || isProg) && (
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              className="tool-btn"
-              onClick={() => fileInputRef.current?.click()}
-              title="Cargar Videos a la Playlist"
-            >
-              <FolderOpen size={14} />
-              <span>Cargar Videos</span>
-            </button>
-            <button
-              className="tool-btn"
-              onClick={handleSavePlaylist}
-              title="Guardar Playlist activa en XML"
-            >
-              <Save size={14} />
-              <span>Guardar XML</span>
-            </button>
-          </div>
-        )}
-
         {/* Acceso a Bitácora As-Run / Auditoría */}
         <button
           className="tool-btn"

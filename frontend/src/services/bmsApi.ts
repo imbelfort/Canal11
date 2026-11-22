@@ -30,6 +30,20 @@ export const bmsApi = {
     });
     return res.json();
   },
+  updateUsuario: async (id: number, data: any) => {
+    const res = await fetch(`${LARAVEL_API}/v1/usuarios/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
+  deleteUsuario: async (id: number) => {
+    const res = await fetch(`${LARAVEL_API}/v1/usuarios/${id}`, {
+      method: 'DELETE'
+    });
+    return res.json();
+  },
   getAuditoria: async () => (await fetch(`${LARAVEL_API}/v1/auditoria`)).json(),
 
   // CU2: Catálogo de Programas

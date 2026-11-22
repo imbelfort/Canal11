@@ -29,26 +29,42 @@ export const isCommercialMedia = (title: string, _filePath?: string): boolean =>
 
 export const getMediaDuration = (file: File): Promise<number> => {
   return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (ms: number) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(ms);
+      }
+    };
+
+    // Timeout de seguridad en caso de que el navegador no pueda leer metadata de ciertos codecs o formatos
+    const timer = setTimeout(() => {
+      finish(file.type.startsWith('image') ? 10000 : 30000);
+    }, 2000);
+
     try {
       const url = URL.createObjectURL(file);
       const video = document.createElement('video');
       video.preload = 'metadata';
       video.onloadedmetadata = () => {
-        URL.revokeObjectURL(url);
+        clearTimeout(timer);
+        try { URL.revokeObjectURL(url); } catch { }
         const durationSec = video.duration;
         if (durationSec && !isNaN(durationSec) && durationSec > 0) {
-          resolve(Math.round(durationSec * 1000));
+          finish(Math.round(durationSec * 1000));
         } else {
-          resolve(file.type.startsWith('image') ? 10000 : 30000);
+          finish(file.type.startsWith('image') ? 10000 : 30000);
         }
       };
       video.onerror = () => {
-        URL.revokeObjectURL(url);
-        resolve(file.type.startsWith('image') ? 10000 : 30000);
+        clearTimeout(timer);
+        try { URL.revokeObjectURL(url); } catch { }
+        finish(file.type.startsWith('image') ? 10000 : 30000);
       };
       video.src = url;
     } catch {
-      resolve(file.type.startsWith('image') ? 10000 : 30000);
+      clearTimeout(timer);
+      finish(file.type.startsWith('image') ? 10000 : 30000);
     }
   });
 };
@@ -90,34 +106,10 @@ export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
     if (xmlFileInputRef.current) xmlFileInputRef.current.value = '';
   };
 
-  const handleAddVideosClick = async () => {
-    if ((window as any).electronAPI?.openVideoDialog) {
-      const paths: string[] = await (window as any).electronAPI.openVideoDialog();
-      if (!paths || paths.length === 0) return;
-      const toAdd = await Promise.all(
-        paths.map(async (fp) => {
-          const filename = fp.split(/[\\/]/).pop() || fp;
-          const title = filename.replace(/\.[^/.]+$/, '');
-          let durationMs = 30000;
-          try {
-            const data: any = await api.probeMedia(fp);
-            if (data?.durationMs) durationMs = data.durationMs;
-          } catch { }
-          const isCommercial = isCommercialMedia(title, fp);
-          return {
-            title,
-            file_path: fp,
-            event_type: isCommercial ? ('COMMERCIAL' as const) : ('VIDEO' as const),
-            duration_ms: durationMs,
-            show_graphics: !isCommercial,
-            timing_mode: 'AUTO_FOLLOW' as const
-          };
-        })
-      );
-      await api.addItems(toAdd);
-      onRefresh();
-    } else {
-      fileInputRef.current?.click();
+  const handleAddVideosClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
     }
   };
 
@@ -125,32 +117,32 @@ export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const toAdd = await Promise.all(
-      files.map(async (file) => {
-        const durationMs = await getMediaDuration(file);
-        let realPath = (file as any).path || file.name;
-        if ((window as any).electronAPI?.getPathForFile) {
-          try {
-            const p = (window as any).electronAPI.getPathForFile(file);
-            if (p) realPath = p;
-          } catch { }
-        }
-        const title = file.name.replace(/\.[^/.]+$/, "");
-        const isCommercial = isCommercialMedia(title, realPath);
-        return {
-          title,
-          file_path: realPath,
-          event_type: isCommercial ? ('COMMERCIAL' as const) : ('VIDEO' as const),
-          duration_ms: durationMs,
-          show_graphics: !isCommercial,
-          timing_mode: 'AUTO_FOLLOW' as const
-        };
-      })
-    );
+    try {
+      const toAdd = await Promise.all(
+        files.map(async (file) => {
+          const durationMs = await getMediaDuration(file);
+          const realPath = (file as any).path || `/mam/storage/${file.name}`;
+          const title = file.name.replace(/\.[^/.]+$/, "");
+          const isCommercial = isCommercialMedia(title, realPath);
+          return {
+            title,
+            file_path: realPath,
+            event_type: isCommercial ? ('COMMERCIAL' as const) : ('VIDEO' as const),
+            duration_ms: durationMs,
+            show_graphics: !isCommercial,
+            timing_mode: 'AUTO_FOLLOW' as const
+          };
+        })
+      );
 
-    await api.addItems(toAdd);
-    onRefresh();
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      await api.addItems(toAdd);
+      onRefresh();
+    } catch (err: any) {
+      console.error('Error al agregar videos:', err);
+      alert(`No se pudo agregar el video a la base de datos: ${err.message || 'Error de conexión'}`);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleAddLiveSdi = async () => {
@@ -202,18 +194,10 @@ export const PlaylistToolbar: React.FC<PlaylistToolbarProps> = ({
         <button
           className="btn-tool primary"
           onClick={handleAddVideosClick}
-          title="Seleccionar archivos de video desde el explorador"
+          title="Seleccionar archivos de video desde el explorador y guardar en PostgreSQL"
         >
           <Plus size={13} />
           <span>Agregar Videos</span>
-        </button>
-        <button className="btn-tool" onClick={handleAddLiveSdi} title="Insertar bloque SDI en vivo (+1h)">
-          <Radio size={13} />
-          <span>Vivo SDI</span>
-        </button>
-        <button className="btn-tool" onClick={handleAddLiveNdi} title="Insertar fuente NDI sobre red IP (vMix, OBS, PTZ)">
-          <Globe size={13} />
-          <span>Vivo NDI</span>
         </button>
         <input
           ref={fileInputRef}

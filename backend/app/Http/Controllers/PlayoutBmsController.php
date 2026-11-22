@@ -20,6 +20,7 @@ use App\Models\Reporte;
 use App\Models\Pago;
 use App\Services\PagoFacilService;
 use Carbon\Carbon;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 class PlayoutBmsController extends Controller
@@ -661,7 +662,7 @@ class PlayoutBmsController extends Controller
         }])->where('fecha', $hoy)->first();
 
         if (!$parrilla) {
-            $parrilla = Parrilla::with(['items.programa.materiales'])->orderBy('id_parrilla', 'desc')->first();
+            $parrilla = Parrilla::with(['items.programa.materiales'])->orderBy('id', 'desc')->first();
         }
 
         $items = [];
@@ -673,9 +674,9 @@ class PlayoutBmsController extends Controller
                 $duracionSec = $mat ? $mat->duracion_segundos : 1800;
 
                 $items[] = [
-                    'id' => $it->id_item_parrilla,
+                    'id' => $it->id,
                     'title' => $it->programa ? $it->programa->titulo : ('Bloque ' . $it->hora_inicio),
-                    'file_path' => $mat ? $mat->ruta_servidor : ('/videos/bloque_' . $it->id_item_parrilla . '.mp4'),
+                    'file_path' => $mat ? $mat->ruta_servidor : ('/videos/bloque_' . $it->id . '.mp4'),
                     'duration_ms' => $duracionSec * 1000,
                     'in_point_ms' => 0,
                     'out_point_ms' => 0,
@@ -691,7 +692,7 @@ class PlayoutBmsController extends Controller
 
         return response()->json([
             'playlist' => [
-                'id' => $parrilla ? $parrilla->id_parrilla : 1,
+                'id' => $parrilla ? $parrilla->id : 1,
                 'name' => $parrilla ? ($parrilla->descripcion . ' (' . $parrilla->fecha . ')') : 'Parrilla General',
                 'total_items' => count($items),
                 'loop_enabled' => false
@@ -707,17 +708,114 @@ class PlayoutBmsController extends Controller
 
     public function addPlayoutItem(Request $request)
     {
-        return response()->json(['success' => true, 'message' => 'Item agregado']);
+        $itemsData = $request->input('items', []);
+        if (empty($itemsData) && $request->has('item')) {
+            $itemsData = [$request->input('item')];
+        }
+
+        if (empty($itemsData)) {
+            return response()->json(['success' => false, 'message' => 'No se enviaron items'], 422);
+        }
+
+        // Obtener o crear parrilla de hoy
+        $hoy = Carbon::today()->toDateString();
+        $parrilla = Parrilla::where('fecha', $hoy)->first();
+        if (!$parrilla) {
+            $parrilla = Parrilla::create([
+                'fecha' => $hoy,
+                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
+                'descripcion' => 'Parrilla de Emisión Playout ' . $hoy,
+                'id_programador' => auth()->id() ?? 1,
+                'estado' => 'APROBADA',
+                'fecha_creacion' => Carbon::now()
+            ]);
+        }
+
+        $created = [];
+        $lastItem = ItemParrilla::where('id_parrilla', $parrilla->id)->orderBy('hora_fin', 'desc')->first();
+        $startTime = $lastItem ? Carbon::parse($lastItem->hora_fin) : Carbon::parse('06:00:00');
+
+        foreach ($itemsData as $it) {
+            $title = $it['title'] ?? 'Clip de Video';
+            $durationMs = (int)($it['duration_ms'] ?? 30000);
+            $durationSec = max(5, round($durationMs / 1000));
+            $filePath = $it['file_path'] ?? ('/mam/storage/' . Str::slug($title) . '.mp4');
+
+            // 1. Buscar o registrar programa para el clip
+            $programa = Programa::where('titulo', $title)->first();
+            if (!$programa) {
+                $code = 'CLIP-' . strtoupper(Str::random(5));
+                $programa = Programa::create([
+                    'codigo' => $code,
+                    'titulo' => $title,
+                    'descripcion' => 'Material agregado desde consola Playout',
+                    'id_categoria' => 1,
+                    'clasificacion_edad' => 'ATP',
+                    'duracion_estandar_minutos' => max(1, round($durationSec / 60)),
+                    'origen' => 'NACIONAL',
+                    'estado' => 'ACTIVO',
+                    'fecha_registro' => Carbon::now()
+                ]);
+            }
+
+            // 2. Registrar el material de video en MAM
+            $material = MaterialVideo::create([
+                'id_programa' => $programa->id,
+                'codigo_material' => 'MAT-' . strtoupper(Str::random(6)),
+                'titulo_clip' => $title,
+                'formato' => 'HD_1080I',
+                'resolucion' => '1920x1080',
+                'duracion_segundos' => $durationSec,
+                'ruta_servidor' => $filePath,
+                'estado' => 'LISTO',
+                'id_responsable' => auth()->id() ?? 1,
+                'fecha_ingesta' => Carbon::now(),
+                'observaciones' => 'Ingesta directa desde Playout Deck'
+            ]);
+
+            // 3. Crear el bloque en item_parrilla
+            $endTime = $startTime->copy()->addSeconds($durationSec);
+            $itemParrilla = ItemParrilla::create([
+                'id_parrilla' => $parrilla->id,
+                'id_programa' => $programa->id,
+                'hora_inicio' => $startTime->format('H:i:s'),
+                'hora_fin' => $endTime->format('H:i:s'),
+                'tipo_emision' => 'GRABADO',
+                'estado' => 'PROGRAMADO',
+                'observaciones' => 'Cargado a escaleta al aire'
+            ]);
+
+            $created[] = [
+                'id' => $itemParrilla->id,
+                'title' => $title,
+                'file_path' => $filePath,
+                'duration_ms' => $durationMs,
+                'status' => 'READY'
+            ];
+
+            $startTime = $endTime;
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($created) . ' video(s) agregados y guardados en base de datos PostgreSQL',
+            'items' => $created
+        ]);
     }
 
     public function deletePlayoutItem($id)
     {
-        ItemParrilla::where('id_item_parrilla', $id)->delete();
+        ItemParrilla::where('id', $id)->delete();
         return response()->json(['success' => true]);
     }
 
     public function clearPlayoutPlaylist()
     {
+        $hoy = Carbon::today()->toDateString();
+        $parrilla = Parrilla::where('fecha', $hoy)->first();
+        if ($parrilla) {
+            ItemParrilla::where('id_parrilla', $parrilla->id)->delete();
+        }
         return response()->json(['success' => true]);
     }
 

@@ -19,7 +19,22 @@ Route::get('/search', [PlayoutBmsController::class, 'search']);
 // Rutas de PagoFácil Callback / Consulta
 Route::get('/pagos', [PlayoutBmsController::class, 'getPagos']);
 Route::post('/pagos/generar-qr', [PlayoutBmsController::class, 'generarPagoQr']);
+Route::get('/pagos/consultar/{transaccionId}', [PlayoutBmsController::class, 'consultarPagoQr']);
+Route::post('/pagos/callback', [PlayoutBmsController::class, 'handlePagoFacilCallback']);
 Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'confirmarPago']);
+
+// Rutas de Playout Web, Auditoría e Incidentes
+Route::get('/playlist', [PlayoutBmsController::class, 'getPlayoutPlaylist']);
+Route::post('/playlist/replace', [PlayoutBmsController::class, 'replacePlayoutPlaylist']);
+Route::post('/playlist/items', [PlayoutBmsController::class, 'addPlayoutItem']);
+Route::delete('/playlist/items/{id}', [PlayoutBmsController::class, 'deletePlayoutItem']);
+Route::post('/playlist/clear', [PlayoutBmsController::class, 'clearPlayoutPlaylist']);
+
+Route::get('/audit/logs', [PlayoutBmsController::class, 'getAuditLogs']);
+Route::get('/audit/stats', [PlayoutBmsController::class, 'getAuditStats']);
+Route::get('/audit/incidents', [PlayoutBmsController::class, 'getIncidents']);
+
+Route::post('/playout/{action}', [PlayoutBmsController::class, 'playoutCommand']);
 
 // Rutas Operativas del Sistema Playout (CU1 a CU8)
 Route::middleware('auth:sanctum')->group(function () {

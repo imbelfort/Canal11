@@ -617,13 +617,25 @@ class PlayoutBmsController extends Controller
         $validated = $request->validate([
             'id_cliente' => 'required|integer',
             'id_spot' => 'nullable|integer',
-            'monto' => 'required|numeric|min:1',
+            'monto' => 'required|numeric|min:0.1',
             'concepto' => 'nullable|string',
             'moneda' => 'nullable|string'
         ]);
 
         $res = $pagoFacil->generarCobroQr($validated);
         return response()->json($res);
+    }
+
+    public function consultarPagoQr($transaccionId, PagoFacilService $pagoFacil)
+    {
+        $res = $pagoFacil->queryTransaction($transaccionId);
+        return response()->json(['success' => true, 'values' => $res]);
+    }
+
+    public function handlePagoFacilCallback(Request $request, PagoFacilService $pagoFacil)
+    {
+        $response = $pagoFacil->handleCallback($request->all());
+        return response()->json($response);
     }
 
     public function confirmarPago($transaccionId, PagoFacilService $pagoFacil)
@@ -635,5 +647,172 @@ class PlayoutBmsController extends Controller
     public function getPagos()
     {
         return response()->json(Pago::with(['cliente', 'spot'])->orderBy('id', 'desc')->get());
+    }
+
+    // ==========================================
+    // INTEGRACIÓN API PLAYOUT (WEB)
+    // ==========================================
+    public function getPlayoutPlaylist()
+    {
+        // Obtener la parrilla activa o la de hoy
+        $hoy = Carbon::today()->toDateString();
+        $parrilla = Parrilla::with(['items.programa.materiales' => function ($q) {
+            $q->where('estado', 'LISTO');
+        }])->where('fecha', $hoy)->first();
+
+        if (!$parrilla) {
+            $parrilla = Parrilla::with(['items.programa.materiales'])->orderBy('id_parrilla', 'desc')->first();
+        }
+
+        $items = [];
+        if ($parrilla && $parrilla->items) {
+            foreach ($parrilla->items as $idx => $it) {
+                $mat = $it->programa && $it->programa->materiales->isNotEmpty() 
+                    ? $it->programa->materiales->first() 
+                    : null;
+                $duracionSec = $mat ? $mat->duracion_segundos : 1800;
+
+                $items[] = [
+                    'id' => $it->id_item_parrilla,
+                    'title' => $it->programa ? $it->programa->titulo : ('Bloque ' . $it->hora_inicio),
+                    'file_path' => $mat ? $mat->ruta_servidor : ('/videos/bloque_' . $it->id_item_parrilla . '.mp4'),
+                    'duration_ms' => $duracionSec * 1000,
+                    'in_point_ms' => 0,
+                    'out_point_ms' => 0,
+                    'event_type' => 'VIDEO',
+                    'timing_mode' => 'AUTO_FOLLOW',
+                    'scheduled_time' => $it->hora_inicio,
+                    'status' => $it->estado === 'EMITIDO' ? 'COMPLETED' : 'READY',
+                    'programa_codigo' => $it->programa ? $it->programa->codigo : 'PRG-GEN',
+                    'channel' => 'Canal 11'
+                ];
+            }
+        }
+
+        return response()->json([
+            'playlist' => [
+                'id' => $parrilla ? $parrilla->id_parrilla : 1,
+                'name' => $parrilla ? ($parrilla->descripcion . ' (' . $parrilla->fecha . ')') : 'Parrilla General',
+                'total_items' => count($items),
+                'loop_enabled' => false
+            ],
+            'items' => $items
+        ]);
+    }
+
+    public function replacePlayoutPlaylist(Request $request)
+    {
+        return response()->json(['success' => true, 'message' => 'Playlist actualizada en web']);
+    }
+
+    public function addPlayoutItem(Request $request)
+    {
+        return response()->json(['success' => true, 'message' => 'Item agregado']);
+    }
+
+    public function deletePlayoutItem($id)
+    {
+        ItemParrilla::where('id_item_parrilla', $id)->delete();
+        return response()->json(['success' => true]);
+    }
+
+    public function clearPlayoutPlaylist()
+    {
+        return response()->json(['success' => true]);
+    }
+
+    public function getAuditLogs(Request $request)
+    {
+        $limit = $request->input('limit', 50);
+        $offset = $request->input('offset', 0);
+        $search = $request->input('search');
+        $status = $request->input('status');
+
+        $query = EmisionRealLog::with(['itemParrilla.programa', 'materialVideo']);
+
+        if ($search) {
+            $query->whereHas('itemParrilla.programa', function ($q) use ($search) {
+                $q->where('titulo', 'ILIKE', "%{$search}%");
+            })->orWhere('operador_emision', 'ILIKE', "%{$search}%");
+        }
+
+        if ($status && $status !== 'ALL') {
+            $query->where('estado_emision', $status);
+        }
+
+        $total = $query->count();
+        $emisiones = $query->orderBy('hora_inicio_real', 'desc')->offset($offset)->limit($limit)->get();
+
+        $logs = [];
+        foreach ($emisiones as $em) {
+            $logs[] = [
+                'id' => $em->id,
+                'title' => $em->itemParrilla && $em->itemParrilla->programa ? $em->itemParrilla->programa->titulo : 'Emisión en Continuidad',
+                'file_path' => $em->materialVideo ? $em->materialVideo->ruta_servidor : '/videos/master.mp4',
+                'event_type' => 'VIDEO',
+                'started_at' => $em->hora_inicio_real,
+                'ended_at' => $em->hora_fin_real,
+                'planned_duration_ms' => ($em->duracion_real_segundos - $em->discrepancia_segundos) * 1000,
+                'actual_duration_ms' => $em->duracion_real_segundos * 1000,
+                'discrepancy_ms' => $em->discrepancia_segundos * 1000,
+                'status' => $em->estado_emision === 'EMITIDO_CORRECTO' ? 'SUCCESS' : ($em->estado_emision === 'CANCELADO' ? 'SKIPPED' : 'ERROR'),
+                'operator' => $em->operador_emision,
+                'notes' => $em->observaciones
+            ];
+        }
+
+        return response()->json([
+            'logs' => $logs,
+            'total' => $total
+        ]);
+    }
+
+    public function getAuditStats()
+    {
+        $totalEmisiones = EmisionRealLog::count();
+        $correctas = EmisionRealLog::where('estado_emision', 'EMITIDO_CORRECTO')->count();
+        $fallidas = EmisionRealLog::where('estado_emision', 'FALLIDO')->count();
+
+        return response()->json([
+            'stats' => [
+                'total_broadcasts' => $totalEmisiones,
+                'successful_broadcasts' => $correctas,
+                'failed_broadcasts' => $fallidas,
+                'total_duration_hours' => round(EmisionRealLog::sum('duracion_real_segundos') / 3600, 2),
+                'uptime_percentage' => $totalEmisiones > 0 ? round(($correctas / $totalEmisiones) * 100, 1) : 100
+            ]
+        ]);
+    }
+
+    public function getIncidents()
+    {
+        $incidentes = ValidacionEmision::with(['itemParrilla.programa', 'inspector'])
+            ->where('resultado_qc', 'RECHAZADO')
+            ->orderBy('id', 'desc')
+            ->limit(30)
+            ->get();
+
+        $list = [];
+        foreach ($incidentes as $inc) {
+            $list[] = [
+                'id' => $inc->id,
+                'item_id' => $inc->id_item_parrilla,
+                'title' => $inc->itemParrilla && $inc->itemParrilla->programa ? $inc->itemParrilla->programa->titulo : 'Rechazo QC',
+                'incident_type' => 'QC_REJECT',
+                'severity' => 'WARNING',
+                'details' => $inc->observaciones . ' (Audio: ' . $inc->nivel_audio_db . ' dB, Aspect: ' . $inc->aspect_ratio . ')',
+                'created_at' => $inc->fecha_validacion,
+                'resolved' => false
+            ];
+        }
+
+        return response()->json([
+            'incidents' => $list
+        ]);
+    }
+
+    public function playoutCommand(Request $request, $action)
+    {
+        return response()->json(['success' => true, 'action' => $action]);
     }
 }

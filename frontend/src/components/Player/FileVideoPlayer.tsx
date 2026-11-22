@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { isTauriEnv } from '../../services/api/client';
-import { convertFileSrc } from '@tauri-apps/api/core';
 
 export interface FileVideoPlayerProps {
   filePath: string;
@@ -56,12 +55,10 @@ export const FileVideoPlayer: React.FC<FileVideoPlayerProps> = ({
 
   const getStreamUrl = useCallback((pathStr: string) => {
     if (!pathStr) return '';
-    try {
-      return convertFileSrc(pathStr);
-    } catch (e) {
-      console.error('[FileVideoPlayer] Error al convertir ruta con convertFileSrc:', e);
+    if (pathStr.startsWith('blob:') || pathStr.startsWith('http://') || pathStr.startsWith('https://') || pathStr.startsWith('/')) {
       return pathStr;
     }
+    return '/' + pathStr;
   }, []);
 
   // Configurar Web Audio API una sola vez cuando el elemento <video> está disponible

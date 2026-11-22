@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a101d"/>
+      <stop offset="50%" stop-color="#141e30"/>
+      <stop offset="100%" stop-color="#0b101b"/>
+    </linearGradient>
+    <linearGradient id="redBar" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#d50000"/>
+      <stop offset="100%" stop-color="#ff1744"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+
+  <!-- SMPTE Top Bars preview -->
+  <rect x="0" y="0" width="274" height="240" fill="#c0c0c0"/>
+  <rect x="274" y="0" width="274" height="240" fill="#c0c000"/>
+  <rect x="548" y="0" width="274" height="240" fill="#00c0c0"/>
+  <rect x="822" y="0" width="274" height="240" fill="#00c000"/>
+  <rect x="1096" y="0" width="274" height="240" fill="#c000c0"/>
+  <rect x="1370" y="0" width="274" height="240" fill="#c00000"/>
+  <rect x="1644" y="0" width="276" height="240" fill="#0000c0"/>
+
+  <!-- Red Station Banner -->
+  <rect x="0" y="440" width="1920" height="200" fill="url(#redBar)"/>
+
+  <!-- Logo and Text -->
+  <text x="960" y="530" font-family="'Segoe UI', Roboto, sans-serif" font-size="72" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="4">
+    IB-CAST
+  </text>
+  <text x="960" y="600" font-family="'Segoe UI', Roboto, sans-serif" font-size="32" font-weight="600" fill="#ffcdd2" text-anchor="middle" letter-spacing="2">
+    SEÑAL DE RESPALDO • CONTINUIDAD DE EMISIÓN
+  </text>
+
+  <!-- Technical Specs at bottom -->
+  <rect x="0" y="980" width="1920" height="100" fill="#06090f"/>
+  <text x="960" y="1040" font-family="'Consolas', monospace" font-size="24" fill="#00d2ff" text-anchor="middle">
+    SALIDA MASTER: 1080i59.94 | DECKLINK 4K | REC 709 4:2:2 | AUDIO 48kHz 24-BIT
+  </text>
+</svg>

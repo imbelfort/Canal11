@@ -1,0 +1,2676 @@
+/* =====================================================================
+   IB-CAST PLAYOUT - GOOGLE MATERIAL DESIGN 3.0 (MATERIAL YOU)
+   Complete Design Specification:
+   - Dynamic M3 Tonal Surface Ladder (Container-Lowest/Low/Standard/High/Highest)
+   - Primary: Google Key Blue (#0b57d0 light / #a8c7fa dark)
+   - Default Preferred Theme: LIGHT (with full Dark Mode support)
+   - Typography: Google Sans / Roboto, refined weights (400-500)
+   - Geometry: 8px small, 16px cards/panels, 24px dialogs, 9999px pill chips & buttons
+   - Elevation: Ambient tonal surface tinting with subtle soft shadow
+   - 100% Backward Compatible Aliases for seamless component integration
+   ===================================================================== */
+
+:root,
+[data-theme="light"] {
+  /* Google Material Design 3 - Light Palette (Default / Preferred) */
+  --md-sys-color-primary: #0b57d0;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d3e3fd;
+  --md-sys-color-on-primary-container: #041e49;
+
+  --md-sys-color-secondary: #00639b;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #c2e7ff;
+  --md-sys-color-on-secondary-container: #001d35;
+
+  --md-sys-color-tertiary: #006874;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #97f0ff;
+  --md-sys-color-on-tertiary-container: #001f24;
+
+  /* Surfaces & Tonal Ladder (Google Workspace / Gemini Light) */
+  --color-canvas: #f8f9fa;               /* App background canvas */
+  --color-canvas-soft: #ffffff;          /* Elevated card / panel surface */
+  --color-field: #edf2fa;                /* Tonal input / tool container */
+  --color-field-hover: #e3e8f0;
+  --color-hairline-soft: #f0f4f9;        /* Subtle hairline */
+  --color-hairline: #e0e3e7;             /* M3 Outline Variant */
+  --color-outline: #747775;
+
+  /* Typography & Ink (Google M3 On-Surface) */
+  --color-primary: #0b57d0;
+  --color-on-primary: #ffffff;
+  --color-ink: #1f1f1f;                  /* Google High-emphasis Text */
+  --color-ink-soft: #444746;             /* Google Medium-emphasis Text */
+  --color-text-muted: #5e6260;           /* Google Secondary Text */
+  --color-text-faint: #8e918f;           /* Google Disabled / Hint Text */
+  --color-accent: #0b57d0;
+  --color-accent-subtle: #d3e3fd;
+
+  /* Broadcast Semantics (M3 Tonal Chips) */
+  --color-live: #ba1a1a;
+  --color-live-subtle: #ffdad6;
+  --color-live-on-subtle: #410002;
+  --color-success: #146c2e;
+  --color-success-subtle: #c4eed0;
+  --color-success-on-subtle: #072711;
+  --color-warning: #8f4e00;
+  --color-warning-subtle: #ffddb9;
+  --color-warning-on-subtle: #2b1700;
+  --color-info: #0b57d0;
+  --color-info-subtle: #d3e3fd;
+  --color-info-on-subtle: #041e49;
+  --color-cyan: #006874;
+  --color-indigo: #3f51b5;
+
+  /* Geometry & Shapes (Google M3 Specification) */
+  --radius-none: 0px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;                     /* M3 Cards & Main Containers */
+  --radius-xl: 24px;                     /* M3 Dialogs */
+  --radius-full: 9999px;                 /* M3 Pills, Chips & FABs */
+  --squircle-radius: 12px;
+
+  /* Spacing */
+  --spacing-xxs: 4px;
+  --spacing-xs: 8px;
+  --spacing-sm: 12px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Typography Material Design 3 */
+  --font-family-sans: "Roboto", "Google Sans", "Google Sans Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-mono: "Roboto Mono", "Google Sans Mono", Consolas, Menlo, monospace;
+  --font-weight-display: 500;
+  --font-weight-title: 500;
+  --font-weight-text: 400;
+  --font-weight-light: 300;
+
+  /* M3 Soft Ambient Elevation */
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  --shadow-hover: 0 3px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-dialog: 0 10px 28px rgba(0, 0, 0, 0.12), 0 3px 8px rgba(0, 0, 0, 0.06);
+
+  /* Backward Compatibility Aliases for components */
+  --bg-app: var(--color-canvas);
+  --bg-surface: var(--color-canvas-soft);
+  --bg-surface-hover: var(--color-field-hover);
+  --bg-card: var(--color-canvas-soft);
+  --bg-elevated: var(--color-canvas-soft);
+  --border-subtle: var(--color-hairline);
+  --border-strong: var(--color-hairline);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-soft);
+  --text-tertiary: var(--color-text-muted);
+  --apple-red: var(--color-live);
+  --apple-green: var(--color-success);
+  --apple-blue: var(--color-accent);
+  --apple-orange: var(--color-warning);
+  --apple-cyan: var(--color-cyan);
+  --apple-indigo: var(--color-indigo);
+}
+
+[data-theme="dark"] {
+  /* Google Material Design 3 - Dark Palette */
+  --md-sys-color-primary: #a8c7fa;
+  --md-sys-color-on-primary: #062e6f;
+  --md-sys-color-primary-container: #0842a0;
+  --md-sys-color-on-primary-container: #d3e3fd;
+
+  --md-sys-color-secondary: #7fcfff;
+  --md-sys-color-on-secondary: #003353;
+  --md-sys-color-secondary-container: #004a77;
+  --md-sys-color-on-secondary-container: #c2e7ff;
+
+  --md-sys-color-tertiary: #4fd8eb;
+  --md-sys-color-on-tertiary: #00363d;
+  --md-sys-color-tertiary-container: #004f58;
+  --md-sys-color-on-tertiary-container: #97f0ff;
+
+  /* Surfaces & Tonal Ladder (Google Dark Canvas) */
+  --color-canvas: #121316;               /* App background canvas */
+  --color-canvas-soft: #1e1f23;          /* Elevated card / panel surface */
+  --color-field: #282a2f;                /* Tonal input / tool container */
+  --color-field-hover: #33353c;
+  --color-hairline-soft: #282a2f;
+  --color-hairline: #36383f;             /* M3 Outline Variant Dark */
+  --color-outline: #8e918f;
+
+  /* Typography & Ink (Google M3 Dark On-Surface) */
+  --color-primary: #a8c7fa;
+  --color-on-primary: #062e6f;
+  --color-ink: #e3e3e3;                  /* Google High-emphasis Text */
+  --color-ink-soft: #c4c7c5;             /* Google Medium-emphasis Text */
+  --color-text-muted: #8e918f;           /* Google Secondary Text */
+  --color-text-faint: #5e6160;           /* Google Disabled / Hint Text */
+  --color-accent: #a8c7fa;
+  --color-accent-subtle: rgba(168, 199, 250, 0.16);
+
+  /* Broadcast Semantics (M3 Dark Tonal Chips) */
+  --color-live: #ffb4ab;
+  --color-live-subtle: rgba(147, 0, 10, 0.45);
+  --color-live-on-subtle: #ffdad6;
+  --color-success: #78dc77;
+  --color-success-subtle: rgba(0, 83, 26, 0.45);
+  --color-success-on-subtle: #c4eed0;
+  --color-warning: #ffb77c;
+  --color-warning-subtle: rgba(108, 58, 0, 0.45);
+  --color-warning-on-subtle: #ffddb9;
+  --color-info: #a8c7fa;
+  --color-info-subtle: rgba(8, 66, 160, 0.45);
+  --color-info-on-subtle: #d3e3fd;
+  --color-cyan: #4fd8eb;
+  --color-indigo: #9fa8da;
+
+  /* M3 Dark Ambient Elevation */
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 3px 8px rgba(0, 0, 0, 0.45);
+  --shadow-dialog: 0 14px 36px rgba(0, 0, 0, 0.65);
+
+  /* Backward Compatibility Aliases for components */
+  --bg-app: var(--color-canvas);
+  --bg-surface: var(--color-canvas-soft);
+  --bg-surface-hover: var(--color-field-hover);
+  --bg-card: var(--color-canvas-soft);
+  --bg-elevated: var(--color-canvas-soft);
+  --border-subtle: var(--color-hairline);
+  --border-strong: var(--color-hairline);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-soft);
+  --text-tertiary: var(--color-text-muted);
+  --apple-red: var(--color-live);
+  --apple-green: var(--color-success);
+  --apple-blue: var(--color-accent);
+  --apple-orange: var(--color-warning);
+  --apple-cyan: var(--color-cyan);
+  --apple-indigo: var(--color-indigo);
+}
+
+/* =====================================================================
+   Base Reset & Typography
+   ===================================================================== */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.1px;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+/* Google M3 Focus Ring */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* =====================================================================
+   Top Navigation / Title Bar (Google M3 Top App Bar)
+   ===================================================================== */
+.ide-titlebar {
+  height: 48px;
+  background-color: var(--color-canvas-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+  z-index: 100;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.ide-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.ide-app-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--color-accent-subtle);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  margin-right: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-app-region: no-drag;
+}
+
+.ide-app-logo:hover {
+  transform: scale(1.05);
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.ide-titlebar-center {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  letter-spacing: 0.2px;
+}
+
+.ide-titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.ide-win-btn:hover {
+  background: var(--color-field-hover) !important;
+  color: var(--color-ink) !important;
+}
+
+.ide-win-btn-close:hover {
+  background: #e81123 !important;
+  color: #ffffff !important;
+}
+
+body.is-electron .ide-titlebar-right {
+  margin-right: 140px;
+}
+
+@media (display-mode: window-controls-overlay) {
+  .ide-titlebar-right {
+    margin-right: 140px;
+  }
+}
+
+/* M3 Menu Dropdown Button */
+.ide-menu-dropdown {
+  position: relative;
+}
+
+.ide-menu-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ide-menu-btn:hover,
+.ide-menu-btn.active {
+  background: var(--color-field);
+  color: var(--color-ink);
+}
+
+/* M3 Elevation 2 Dropdown Menu */
+.ide-dropdown-menu {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  background: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-md);
+  min-width: 260px;
+  padding: 6px;
+  box-shadow: var(--shadow-dialog);
+  z-index: 1000;
+}
+
+.ide-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.ide-menu-item:hover {
+  background: var(--color-field);
+  color: var(--color-primary);
+}
+
+.ide-shortcut {
+  font-size: 11px;
+  font-family: var(--font-family-mono);
+  color: var(--color-text-faint);
+}
+
+.ide-menu-divider {
+  height: 1px;
+  background: var(--color-hairline);
+  margin: 4px 6px;
+}
+
+/* Google M3 Icon Buttons */
+.ide-icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--color-ink-soft);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.ide-icon-btn:hover {
+  background: var(--color-field);
+  color: var(--color-ink);
+}
+
+/* Google M3 Theme Switch Pill */
+.theme-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-ink);
+  background: var(--color-field);
+  border: 1px solid transparent;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.theme-toggle-btn:hover {
+  background: var(--color-field-hover);
+  border-color: var(--color-hairline);
+}
+
+.ide-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+  background: var(--color-field);
+  border: 1px solid transparent;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+}
+
+.ide-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-text-faint);
+}
+
+.ide-dot.online {
+  background: var(--color-success);
+  box-shadow: 0 0 6px var(--color-success);
+}
+
+.ide-title-clock {
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-field);
+  border: 1px solid transparent;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+}
+
+/* ==========================================================================
+   BROADCAST TALLY SYSTEM (ON AIR / PAUSED)
+   ========================================================================== */
+@keyframes tally-dot-blink {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 6px rgba(220, 38, 38, 0.85);
+  }
+  50% {
+    opacity: 0.2;
+    transform: scale(0.85);
+    box-shadow: 0 0 1px transparent;
+  }
+}
+
+/* Alerta crítica de cuenta regresiva (Últimos 10 segundos) */
+@keyframes countdown-urgent-blink {
+  0%, 100% {
+    color: #ef4444;
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+  }
+  50% {
+    color: #ffffff;
+    opacity: 0.35;
+    text-shadow: none;
+  }
+}
+
+.countdown-critical-10s {
+  color: #ef4444 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  animation: countdown-urgent-blink 0.8s infinite ease-in-out !important;
+}
+
+.on-air-text-mask-faded {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  mask-image: linear-gradient(to right, black 82%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 82%, transparent 100%);
+}
+
+@keyframes tally-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.05);
+  }
+}
+
+.tally-on-air-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  animation: tally-glow-pulse 1.8s infinite ease-in-out;
+  user-select: none;
+}
+
+[data-theme="dark"] .tally-on-air-pill {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.tally-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.tally-dot.blinking {
+  background-color: #dc2626;
+  animation: tally-dot-blink 1s infinite ease-in-out;
+}
+
+[data-theme="dark"] .tally-dot.blinking {
+  background-color: #ef4444;
+}
+
+.tally-paused-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(234, 179, 8, 0.12);
+  color: #b45309;
+  border: 1px solid rgba(234, 179, 8, 0.4);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  user-select: none;
+}
+
+[data-theme="dark"] .tally-paused-pill {
+  background: rgba(234, 179, 8, 0.18);
+  color: #facc15;
+  border-color: rgba(234, 179, 8, 0.5);
+}
+
+.tally-dot.paused {
+  background-color: #eab308;
+}
+
+/* =====================================================================
+   Master Layout (Main Workspace Grid)
+   ===================================================================== */
+.master-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
+  padding: 0;
+  background-color: var(--color-canvas);
+}
+
+/* Left Panel: Monitor & Controls */
+.left-control-panel {
+  width: 440px;
+  min-width: 400px;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-right: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  overflow-y: auto;
+}
+
+/* Google M3 Surface Card */
+.monitor-card {
+  background: var(--color-canvas);
+  border: none;
+  border-bottom: 1px solid var(--color-hairline);
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: none;
+}
+
+.card-header {
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  color: var(--color-ink-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-canvas);
+}
+
+/* M3 Tonal Status Badge */
+.on-air-tag {
+  background: var(--color-live-subtle);
+  color: var(--color-live);
+  border: 1px solid transparent;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.screen-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #000000;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.video-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000000;
+}
+
+.screen-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.overlay-badge {
+  background: rgba(18, 19, 22, 0.76);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  font-size: 9.5px;
+  font-family: var(--font-family-mono);
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.vu-meter-bar {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  height: 52%;
+  width: 16px;
+  display: flex;
+  gap: 2px;
+  background: rgba(13, 17, 23, 0.88);
+  backdrop-filter: blur(8px);
+  padding: 3px 2px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.vu-meter-bar.interactive-vu {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.vu-meter-bar.interactive-vu:hover {
+  transform: scale(1.05);
+  border-color: rgba(59, 130, 246, 0.85);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.5), 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+.vu-channel {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.vu-level {
+  width: 100%;
+  background: linear-gradient(
+    0deg,
+    #22c55e 0%,
+    #22c55e 68%,
+    #f59e0b 86%,
+    #ef4444 100%
+  );
+  height: 0%;
+  transition: height 0.06s cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+.vu-target-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 68%;
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.9);
+}
+
+.vu-ch-label {
+  position: absolute;
+  bottom: 1px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 7px;
+  font-family: var(--font-family-mono);
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.65);
+  pointer-events: none;
+  line-height: 1;
+}
+
+/* Progress & Timecodes (Google M3) */
+.progress-track {
+  width: 100%;
+  height: 4px;
+  background: var(--color-field);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--color-accent);
+  border-radius: var(--radius-full);
+  transition: width 0.1s linear;
+}
+
+/* Material Design 3 - Linear Progress Indicator (Subtle Browser-like Bar) */
+.m3-linear-loader {
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(11, 87, 208, 0.08);
+  transition: opacity 0.2s ease, height 0.2s ease;
+}
+
+.m3-linear-loader-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(90deg, transparent, var(--color-primary, #0b57d0), var(--color-cyan, #00b4d8), var(--color-primary, #0b57d0), transparent);
+  animation: m3-linear-glide 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  border-radius: 9999px;
+}
+
+@keyframes m3-linear-glide {
+  0% {
+    left: -45%;
+    width: 45%;
+  }
+  50% {
+    left: 20%;
+    width: 65%;
+  }
+  100% {
+    left: 100%;
+    width: 45%;
+  }
+}
+
+.m3-linear-loader.inactive {
+  height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tc-readouts {
+  display: flex;
+  gap: 8px;
+}
+
+.tc-box {
+  flex: 1;
+  background: var(--color-field);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  transition: background 0.12s ease;
+}
+
+.tc-label {
+  font-size: 9.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  letter-spacing: 0.3px;
+  margin-bottom: 2px;
+}
+
+.tc-value {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.tc-box.elapsed .tc-value {
+  color: var(--color-primary);
+}
+
+.tc-box.remaining .tc-value {
+  color: var(--color-live);
+}
+
+/* Master Controls Deck */
+.controls-card {
+  background: var(--color-canvas);
+  border: none;
+  border-bottom: 1px solid var(--color-hairline);
+  border-radius: 0;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: none;
+}
+
+.button-grid-main {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* Google M3 Buttons (Pills / Rounded) */
+.btn-cmd {
+  background: var(--color-field);
+  border: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  padding: 10px 16px;
+  height: 42px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-cmd:hover {
+  background: var(--color-field-hover);
+  border-color: var(--color-hairline);
+}
+
+.btn-cmd.play {
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: transparent;
+  font-weight: 600;
+}
+.btn-cmd.play:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 2px 6px rgba(0, 102, 255, 0.3);
+}
+.btn-cmd.play.active {
+  background: rgba(22, 163, 74, 0.16);
+  color: #16a34a;
+  border-color: #16a34a;
+}
+.btn-cmd.play:hover {
+  background: var(--color-success);
+  color: #ffffff;
+}
+
+.button-grid-broadcast {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-take-live {
+  background: var(--color-info-subtle);
+  border: 1px solid transparent;
+  color: var(--color-info);
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-take-live:hover {
+  background: var(--color-accent);
+  color: #ffffff;
+}
+
+.btn-take-live.active {
+  background: var(--color-live);
+  color: #ffffff;
+}
+
+.btn-emergency {
+  background: var(--color-live-subtle);
+  border: 1px solid transparent;
+  color: var(--color-live);
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-emergency:hover {
+  background: var(--color-live);
+  color: #ffffff;
+}
+
+/* =====================================================================
+   Right Workspace (Playlist, Audit, Incidents)
+   ===================================================================== */
+.right-workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-canvas);
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+}
+
+/* M3 Segmented Navigation Tabs */
+.workspace-tabs {
+  background: var(--color-canvas-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  gap: 4px;
+  padding: 5px 12px;
+}
+
+.tab-btn {
+  padding: 5px 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.tab-btn:hover {
+  color: var(--color-ink);
+  background: var(--color-field);
+}
+
+.tab-btn.active {
+  color: var(--color-on-primary-container);
+  background: var(--color-accent-subtle);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+/* Toolbar & Action Controls */
+.playlist-toolbar,
+.audit-toolbar {
+  padding: 5px 12px;
+  background: var(--color-canvas-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-tool {
+  background: var(--color-field);
+  border: 1px solid transparent;
+  color: var(--color-ink);
+  padding: 4px 10px;
+  height: 28px;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.btn-tool:hover {
+  background: var(--color-field-hover);
+  border-color: var(--color-hairline);
+}
+
+.btn-tool.primary {
+  background: var(--color-primary);
+  border: 1px solid transparent;
+  color: var(--color-on-primary);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(11, 87, 208, 0.2);
+}
+
+.btn-tool.primary:hover {
+  opacity: 0.94;
+  box-shadow: 0 2px 4px rgba(11, 87, 208, 0.3);
+}
+
+/* Metrics Bar (M3 Tonal Stats) */
+.stats-bar {
+  display: flex;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--color-field);
+  border-bottom: 1px solid var(--color-hairline);
+  align-items: center;
+}
+
+.stat-metric {
+  background: var(--color-canvas-soft);
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-hairline);
+  display: flex;
+  flex-direction: column;
+}
+
+/* On-Air Beacon Card for Far-Distance MCR Visibility */
+.stat-metric.on-air-beacon-card {
+  position: relative;
+  background: rgba(11, 87, 208, 0.08);
+  border: 1.5px solid #0b57d0;
+  border-radius: 4px;
+  animation: on-air-card-pulse 1.8s infinite ease-in-out;
+  transition: all 0.2s ease;
+}
+
+.stat-metric.on-air-beacon-card .on-air-label {
+  color: #0b57d0 !important;
+  font-weight: 700;
+}
+
+.stat-metric.on-air-beacon-card .on-air-title {
+  color: #041e49 !important; /* Alto contraste en modo blanco / claro */
+  font-weight: 700;
+}
+
+.stat-metric.on-air-beacon-card .on-air-pulse-dot {
+  background-color: #0b57d0;
+  box-shadow: 0 0 6px rgba(11, 87, 208, 0.6);
+}
+
+/* Modo oscuro para tarjeta al aire estándar */
+[data-theme='dark'] .stat-metric.on-air-beacon-card {
+  background: rgba(0, 122, 255, 0.18);
+  border-color: #38bdf8;
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card .on-air-label {
+  color: #38bdf8 !important;
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card .on-air-title {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card .on-air-pulse-dot {
+  background-color: #00e5ff;
+  box-shadow: 0 0 8px #00e5ff;
+}
+
+@keyframes on-air-card-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(10, 132, 255, 0.3), inset 0 0 4px rgba(10, 132, 255, 0.1);
+    border-color: #0b57d0;
+  }
+  50% {
+    box-shadow: 0 0 16px 2px rgba(10, 132, 255, 0.7), inset 0 0 8px rgba(10, 132, 255, 0.3);
+    border-color: #38bdf8;
+  }
+}
+
+/* Pulsing on-air commercial beacon variant (Morado para Avances / Comerciales al aire) */
+.stat-metric.on-air-beacon-card.is-commercial {
+  background: rgba(147, 51, 234, 0.08) !important;
+  border-color: #7e22ce !important;
+  animation: on-air-commercial-pulse 1.8s infinite ease-in-out !important;
+}
+
+.stat-metric.on-air-beacon-card.is-commercial .on-air-label {
+  color: #6b21a8 !important; /* Púrpura profundo legible en modo blanco */
+}
+
+.stat-metric.on-air-beacon-card.is-commercial .on-air-title {
+  color: #3b0764 !important; /* Máximo contraste en fondo blanco */
+  font-weight: 700;
+}
+
+.stat-metric.on-air-beacon-card.is-commercial .on-air-pulse-dot {
+  background-color: #7e22ce !important;
+  box-shadow: 0 0 8px rgba(126, 34, 206, 0.6) !important;
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card.is-commercial {
+  background: rgba(168, 85, 247, 0.18) !important;
+  border-color: #c084fc !important;
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card.is-commercial .on-air-label {
+  color: #d8b4fe !important;
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card.is-commercial .on-air-title {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='dark'] .stat-metric.on-air-beacon-card.is-commercial .on-air-pulse-dot {
+  background-color: #d8b4fe !important;
+  box-shadow: 0 0 8px #c084fc !important;
+}
+
+@keyframes on-air-commercial-pulse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(168, 85, 247, 0.3), inset 0 0 4px rgba(168, 85, 247, 0.1);
+    border-color: #7e22ce;
+  }
+  50% {
+    box-shadow: 0 0 16px 2px rgba(168, 85, 247, 0.75), inset 0 0 8px rgba(168, 85, 247, 0.35);
+    border-color: #c084fc;
+  }
+}
+
+/* Blinking dot indicator for high-distance visibility */
+.on-air-pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  animation: beacon-dot-blink 1s infinite alternate ease-in-out;
+  flex-shrink: 0;
+}
+
+@keyframes beacon-dot-blink {
+  0% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+/* Radio icon subtle wave animation */
+.on-air-radio-icon {
+  animation: radio-icon-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes radio-icon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+}
+
+.stat-metric .num {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-ink);
+  font-family: var(--font-family-mono);
+  line-height: 1.2;
+}
+
+.stat-metric .lbl {
+  font-size: 8.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 1px;
+  line-height: 1;
+}
+
+/* Data Table (Google M3 Data Grid) */
+.table-scroll-container {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-canvas-soft);
+}
+
+.playlist-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.playlist-table th {
+  background: var(--color-field);
+  color: var(--color-ink-soft);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.3px;
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-hairline);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  white-space: nowrap;
+}
+
+.playlist-table td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--color-hairline);
+  color: var(--color-ink);
+  font-size: 11.5px;
+  line-height: 1.2;
+}
+
+.playlist-table tr {
+  transition: background 0.1s ease;
+}
+
+.playlist-table tr:hover {
+  background: var(--color-field);
+}
+
+/* Fila de elemento en emisión activa (Al Aire - Cyan / Azul activo broadcast, NO rojo) */
+.playlist-table tr.row-on-air {
+  background: rgba(10, 132, 255, 0.16) !important;
+  border-left: 3px solid #007aff !important;
+  box-shadow: inset 0 0 10px rgba(10, 132, 255, 0.08) !important;
+}
+
+[data-theme='dark'] .playlist-table tr.row-on-air {
+  background: rgba(0, 122, 255, 0.22) !important;
+  border-left: 3px solid #0a84ff !important;
+  box-shadow: inset 0 0 12px rgba(0, 122, 255, 0.12) !important;
+}
+
+/* Selección múltiple o individual con Ctrl / Shift (Celeste / Azul luminoso) */
+.playlist-table tr.row-selected {
+  background-color: rgba(0, 122, 255, 0.22) !important;
+  outline: 1.5px solid rgba(10, 132, 255, 0.75) !important;
+  outline-offset: -1.5px;
+}
+
+[data-theme='dark'] .playlist-table tr.row-selected {
+  background-color: rgba(10, 132, 255, 0.3) !important;
+  outline: 1.5px solid rgba(100, 210, 255, 0.85) !important;
+  outline-offset: -1.5px;
+}
+
+/* Fila de elemento ya emitido (gris neutro atenuado como estándar de playout) */
+.playlist-table tr.row-played {
+  background-color: rgba(148, 163, 184, 0.08) !important;
+  border-left: 3px solid #94a3b8 !important;
+  opacity: 0.65;
+  transition: all 0.15s ease;
+}
+
+[data-theme='dark'] .playlist-table tr.row-played {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border-left: 3px solid #64748b !important;
+  opacity: 0.60;
+}
+
+.playlist-table tr.row-played:hover {
+  background-color: rgba(148, 163, 184, 0.14) !important;
+  opacity: 0.85;
+}
+
+[data-theme='dark'] .playlist-table tr.row-played:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  opacity: 0.80;
+}
+
+.playlist-table tr.row-played td,
+.playlist-table tr.row-played .title-text,
+.playlist-table tr.row-played .commercial-title {
+  color: var(--color-text-muted) !important;
+}
+
+/* Fila de elemento con error / archivo no encontrado (pinta toda la fila en rojo sutil) */
+.playlist-table tr.row-missing {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+  border-left: 3px solid #ef4444 !important;
+  transition: background-color 0.15s ease;
+}
+
+[data-theme='dark'] .playlist-table tr.row-missing {
+  background-color: rgba(239, 68, 68, 0.16) !important;
+  border-left: 3px solid #ef4444 !important;
+}
+
+.playlist-table tr.row-missing:hover {
+  background-color: rgba(239, 68, 68, 0.20) !important;
+}
+
+[data-theme='dark'] .playlist-table tr.row-missing:hover {
+  background-color: rgba(239, 68, 68, 0.24) !important;
+}
+
+.playlist-table tr.row-missing td {
+  color: var(--color-ink) !important;
+}
+
+/* Fila de Corte Comercial / Avance (Púrpura / Morado para distinguir bloques publicitarios) */
+.playlist-table tr.row-commercial {
+  background-color: rgba(147, 51, 234, 0.06) !important;
+  border-left: 3px solid #7e22ce !important;
+}
+
+[data-theme='dark'] .playlist-table tr.row-commercial {
+  background-color: rgba(168, 85, 247, 0.12) !important;
+  border-left: 3px solid #c084fc !important;
+}
+
+.playlist-table tr.row-commercial:hover {
+  background-color: rgba(147, 51, 234, 0.12) !important;
+}
+
+[data-theme='dark'] .playlist-table tr.row-commercial:hover {
+  background-color: rgba(168, 85, 247, 0.22) !important;
+}
+
+/* Si ya fue emitido y es comercial, se vuelve gris atenuado como pide el usuario */
+.playlist-table tr.row-commercial.row-played {
+  background-color: rgba(148, 163, 184, 0.06) !important;
+  border-left: 3px solid #94a3b8 !important;
+  opacity: 0.60;
+}
+
+/* Fila de comercial al aire (prioridad activa con acento morado broadcast) */
+.playlist-table tr.row-on-air.row-commercial {
+  border-left: 3px solid #7e22ce !important;
+  box-shadow: inset 0 0 14px rgba(147, 51, 234, 0.2) !important;
+}
+
+[data-theme='dark'] .playlist-table tr.row-on-air.row-commercial {
+  border-left: 3px solid #c084fc !important;
+  box-shadow: inset 0 0 14px rgba(168, 85, 247, 0.3) !important;
+}
+
+/* Título de Avance / Comercial adaptado a modo claro y oscuro */
+.commercial-title {
+  color: #7e22ce !important; /* Alto contraste nítido en modo blanco */
+  font-weight: 600 !important;
+}
+
+[data-theme='dark'] .commercial-title {
+  color: #c084fc !important; /* Lavanda luminoso en modo oscuro */
+}
+
+/* Insignia / Badge de Avance / Comercial */
+.badge-commercial {
+  font-size: 8.5px;
+  font-weight: 700;
+  font-family: var(--font-family-mono);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(126, 34, 206, 0.10);
+  border: 1px solid rgba(126, 34, 206, 0.45);
+  color: #6b21a8; /* Alto contraste legible en modo blanco */
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+[data-theme='dark'] .badge-commercial {
+  background: rgba(168, 85, 247, 0.22);
+  border-color: rgba(192, 132, 252, 0.55);
+  color: #e9d5ff; /* Luminoso en modo oscuro */
+}
+
+/* Cuando ya fue emitido, el badge se vuelve gris neutro */
+.playlist-table tr.row-played .badge-commercial {
+  background: rgba(148, 163, 184, 0.12) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  color: var(--color-text-muted) !important;
+  opacity: 0.7;
+}
+
+.badge-status.missing {
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #dc2626 !important;
+  font-weight: 600;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+[data-theme='dark'] .badge-status.missing {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+/* Google M3 Status Chips */
+.badge-status {
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.badge-status.on-air {
+  background: var(--color-live-subtle);
+  color: var(--color-live);
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.badge-status.on-air::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-live);
+  animation: tally-dot-blink 1s infinite ease-in-out;
+}
+
+.badge-status.next {
+  background: var(--color-info-subtle);
+  color: var(--color-info);
+}
+
+.badge-status.pending {
+  background: var(--color-field);
+  color: var(--color-ink-soft);
+}
+
+.badge-status.played {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.badge-status.error {
+  background: var(--color-live-subtle);
+  color: var(--color-live);
+}
+
+.badge-popular {
+  background: var(--color-accent);
+  color: #ffffff;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* =====================================================================
+   Modals & Dialogs (Google Material 3 Dialog)
+   ===================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(4px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal-card {
+  background: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-dialog);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-canvas-soft);
+}
+
+.modal-header h3 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-ink);
+  letter-spacing: 0.1px;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-hairline);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: var(--color-canvas-soft);
+}
+
+/* Google M3 Dialog Buttons */
+.modal-btn-primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border: 1px solid transparent;
+  padding: 7px 18px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.modal-btn-primary:hover {
+  opacity: 0.94;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.modal-btn-outline {
+  background: transparent;
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  padding: 7px 18px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-btn-outline:hover {
+  background: var(--color-field);
+  border-color: var(--color-outline);
+}
+
+.modal-btn-danger {
+  background: var(--color-live);
+  color: #ffffff;
+  border: 1px solid transparent;
+  padding: 7px 18px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.modal-btn-danger:hover {
+  opacity: 0.92;
+}
+
+/* Form Inputs (Google M3 Outlined / Tonal Fields) */
+input[type="text"],
+input[type="number"],
+input[type="time"],
+select,
+textarea {
+  background-color: var(--color-field);
+  color: var(--color-ink);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="time"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--color-accent);
+  background-color: var(--color-canvas-soft);
+  box-shadow: 0 0 0 2px var(--color-accent-subtle);
+}
+
+/* Context Menu (M3 Menu) */
+.playlist-context-menu {
+  background-color: var(--color-canvas-soft) !important;
+  border: 1px solid var(--color-hairline) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-dialog) !important;
+  padding: 6px !important;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 450;
+  color: var(--color-ink);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.1s ease, color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: var(--color-field);
+  color: var(--color-primary);
+}
+
+.context-menu-item.danger:hover {
+  background-color: var(--color-live-subtle);
+  color: var(--color-live);
+}
+
+.context-menu-divider {
+  height: 1px;
+  background-color: var(--color-hairline);
+  margin: 4px 6px;
+}
+
+/* Minimal Footer */
+.master-footer {
+  height: 30px;
+  background: var(--color-canvas-soft);
+  border-top: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+
+/* =====================================================================
+   GOOGLE MATERIAL DESIGN 3.0 - STACKED BROADCAST TIMINGS & LOOP UX
+   ===================================================================== */
+.m3-timing-section {
+  padding: 12px 14px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+}
+
+.m3-timing-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.m3-timing-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-field);
+  border: 1px solid transparent;
+}
+
+.m3-timing-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.m3-timing-value {
+  font-family: var(--font-family-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: 0.5px;
+}
+
+.m3-timing-row.elapsed .m3-timing-value {
+  color: var(--color-primary);
+}
+
+.m3-timing-row.remaining {
+  background: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+}
+
+.m3-timing-row.remaining .remaining-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.m3-timing-row.remaining.near-end-alert {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.4);
+}
+
+.m3-timing-row.remaining.near-end-alert .remaining-value {
+  color: #dc2626 !important;
+  font-weight: 800;
+  text-shadow: 0 0 8px rgba(220, 38, 38, 0.35);
+}
+
+.near-end-fill {
+  background-color: #dc2626 !important;
+  animation: tally-glow-pulse 1s infinite ease-in-out;
+}
+
+.m3-near-end-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  background: rgba(220, 38, 38, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.4);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.4px;
+}
+
+/* Next cue bar flat design */
+.m3-next-cue-bar {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Stop command button */
+.btn-cmd.stop {
+  color: #dc2626;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(220, 38, 38, 0.06);
+}
+.btn-cmd.stop:hover {
+  background: rgba(220, 38, 38, 0.16);
+  border-color: #dc2626;
+}
+
+/* Material Design 3.0 Loop Toggle Chip & Bar */
+.m3-loop-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-hairline);
+}
+
+.m3-loop-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 11.5px;
+  font-weight: 600;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-field);
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.m3-loop-toggle:hover {
+  background: var(--color-field-hover);
+  color: var(--color-ink);
+}
+
+.m3-loop-toggle.active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.m3-switch-pill {
+  width: 26px;
+  height: 14px;
+  border-radius: var(--radius-full);
+  background: rgba(120, 120, 128, 0.3);
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+}
+
+.m3-switch-pill.checked {
+  background: var(--color-accent);
+}
+
+.m3-switch-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ffffff;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.m3-switch-pill.checked .m3-switch-thumb {
+  transform: translateX(12px);
+}
+
+.m3-broadcast-standard-tag {
+  font-size: 10.5px;
+  font-family: var(--font-family-mono);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* =====================================================================
+   MATERIAL DESIGN 3 - BROADCAST DIALOG & SURFACE SYSTEM
+   ===================================================================== */
+.m3-dialog-card {
+  width: 92vw;
+  max-width: 920px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 28px;
+  background: var(--color-canvas-soft);
+  border: 1px solid var(--color-hairline);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  position: relative;
+}
+
+.m3-dialog-header {
+  padding: 20px 28px 16px 28px;
+  border-bottom: 1px solid var(--color-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-canvas-soft);
+  flex-shrink: 0;
+}
+
+.m3-headline-small {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: 0.15px;
+  font-family: var(--font-family-sans);
+  margin: 0;
+}
+
+.m3-icon-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.m3-icon-button:hover {
+  background: var(--color-field-hover);
+  color: var(--color-ink);
+}
+
+.m3-primary-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 24px;
+  background: var(--color-canvas-soft);
+  border-bottom: 1px solid var(--color-hairline);
+  flex-shrink: 0;
+}
+
+.m3-tab-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px 14px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.m3-tab-item:hover {
+  color: var(--color-ink);
+}
+
+.m3-tab-item.active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.m3-tab-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 10px;
+  right: 10px;
+  height: 3px;
+  border-radius: 4px 4px 0 0;
+  background: var(--color-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.m3-radio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.m3-radio-card {
+  padding: 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--color-hairline);
+  background: var(--color-canvas-soft);
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+}
+
+.m3-radio-card:hover {
+  border-color: var(--color-outline);
+  background: var(--color-field-hover);
+}
+
+.m3-radio-card.active {
+  border-color: var(--color-primary);
+  background: var(--color-accent-subtle);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.m3-outlined-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.m3-field-label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--color-ink-soft);
+  letter-spacing: 0.1px;
+}
+
+.m3-outlined-control {
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--color-hairline);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  padding: 0 12px;
+  font-size: 12.5px;
+  font-family: var(--font-family-sans);
+  outline: none;
+  transition: all 0.15s ease;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.m3-outlined-control:focus,
+.m3-outlined-control:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.m3-outlined-control:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--color-field);
+}
+
+.m3-assist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.m3-assist-chip.online {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.m3-assist-chip.offline {
+  background: var(--color-live-subtle);
+  color: var(--color-live);
+  border: 1px solid rgba(186, 26, 26, 0.4);
+}
+
+.m3-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: var(--color-warning-subtle);
+  color: var(--color-warning-on-subtle);
+  border: 1px solid rgba(143, 78, 0, 0.25);
+}
+
+.m3-dialog-footer {
+  position: sticky;
+  bottom: 0;
+  padding: 16px 28px;
+  border-top: 1px solid var(--color-hairline);
+  background: var(--color-canvas-soft);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.m3-btn-filled {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+.m3-btn-filled:hover {
+  opacity: 0.93;
+  box-shadow: var(--shadow-hover);
+}
+
+.m3-btn-text {
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.m3-btn-text:hover {
+  background: var(--color-field-hover);
+}
+
+.m3-btn-tonal {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background: var(--color-field);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--color-hairline);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.m3-btn-tonal:hover:not(:disabled) {
+  background: var(--color-field-hover);
+  border-color: var(--color-primary);
+}
+
+.m3-btn-tonal:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.m3-btn-danger {
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 9999px;
+  background: var(--color-live);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: var(--shadow-card);
+}
+
+.m3-btn-danger:hover {
+  opacity: 0.92;
+  box-shadow: var(--shadow-hover);
+}
+
+.m3-btn-tonal-danger {
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 9999px;
+  background: var(--color-live-subtle);
+  color: var(--color-live);
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(186, 26, 26, 0.35);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.m3-btn-tonal-danger:hover:not(:disabled) {
+  background: rgba(186, 26, 26, 0.22);
+}
+
+/* =====================================================================
+   Stageshow Craft & Broadcast UI Aesthetics (benjitaylor/skills standards)
+   - Strict Tabular Numerics for timecodes, counts, clocks, and telemetry
+   - Surface steps & hairline borders for depth (anti-blur / crisp clarity)
+   - Fixed table tracks, 12px/8px insets, zero emoji, zero random AI decorations
+   - Calibrated micro-interactions and tactile feedback
+   ===================================================================== */
+
+/* Tabular Numerics: Numbers never jump or jitter during real-time playback */
+.tnum,
+.station-clock,
+.m3-timing-value,
+.remaining-value,
+.tc-value,
+.vu-meter-bar,
+.playlist-table td:nth-child(1),
+.playlist-table td:nth-child(2),
+.playlist-table td:nth-child(5),
+.audit-table td:nth-child(1),
+.audit-table td:nth-child(6),
+.audit-table td:nth-child(7),
+.ide-telemetry-item,
+.telemetry-chip {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Tactile micro-interactions for broadcast transport deck */
+.btn-cmd {
+  position: relative;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-cmd:active {
+  transform: scale(0.97);
+}
+
+.btn-cmd.play.active {
+  background: var(--color-accent) !important;
+  color: var(--color-on-primary, #ffffff) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 2px 8px rgba(11, 87, 208, 0.4) !important;
+}
+
+[data-theme="dark"] .btn-cmd.play.active {
+  background: #0a84ff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 1px #0a84ff, 0 2px 10px rgba(10, 132, 255, 0.45) !important;
+}
+
+/* Playlist density & clean rhythm for 10+ visible items */
+.playlist-table th {
+  padding: 5px 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.playlist-table td {
+  padding: 3px 8px;
+  line-height: 1.2;
+}
+
+.playlist-table tr:hover .row-grip-handle {
+  opacity: 0.85 !important;
+}
+
+/* Refined status pills */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+/* Next cue bar craft */
+.m3-next-cue-bar {
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Telemetry dock footer */
+.app-footer {
+  font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================================
+   MASTER AUDIO FADER & EBU R128 NORMALIZER CONTROL BAR
+   ===================================================================== */
+.master-audio-fader-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--color-field);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.audio-fader-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.audio-fader-label {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.broadcast-vol-slider {
+  flex: 1;
+  max-width: 120px;
+  min-width: 50px;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--color-canvas-soft, rgba(128, 128, 128, 0.25));
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.broadcast-vol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.broadcast-vol-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.broadcast-vol-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.audio-db-badge {
+  font-family: var(--font-family-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.audio-db-badge:hover {
+  border-color: var(--color-primary);
+}
+
+.audio-db-badge.boosted {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #d97706;
+}
+
+[data-theme="dark"] .audio-db-badge.boosted {
+  color: #fbbf24;
+}
+
+.audio-fader-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.norm-toggle-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.norm-toggle-pill.active-norm {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #15803d;
+}
+
+[data-theme="dark"] .norm-toggle-pill.active-norm {
+  background: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #4ade80;
+}
+
+.norm-toggle-pill.bypass-norm {
+  background: rgba(148, 163, 184, 0.15);
+  border-color: rgba(148, 163, 184, 0.35);
+  color: #64748b;
+}
+
+[data-theme="dark"] .norm-toggle-pill.bypass-norm {
+  color: #94a3b8;
+}
+
+.limiter-indicator-pill {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #2563eb;
+}
+
+[data-theme="dark"] .limiter-indicator-pill {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.2);
+}
+
+
+/* ==========================================================================
+   Broadcast Dual Monitor: Identifiers & Input Preview Selector
+   ========================================================================== */
+.m3-monitor-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 4px;
+  user-select: none;
+}
+
+.m3-monitor-tag.pgm {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.m3-monitor-tag.preview {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.m3-input-selector-btn {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: var(--color-field);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.m3-input-selector-btn:hover {
+  background: var(--color-field-hover, rgba(255, 255, 255, 0.08));
+}
+
+.m3-input-selector-btn.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.m3-input-dropdown {
+  font-size: 10px;
+  background: var(--color-field);
+  color: var(--color-ink);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 2px 6px;
+  max-width: 145px;
+  outline: none;
+  font-family: inherit;
+}
+
+/* ==========================================================================
+   Broadcast Dual Monitors Grid (Side-by-Side: PGM on Left, PREVIEW on Right)
+   ========================================================================== */
+.broadcast-dual-monitors-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 8px 6px 8px;
+  background: var(--color-canvas);
+}
+
+.broadcast-monitor-column {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-field);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.broadcast-monitor-column .card-header {
+  padding: 5px 8px;
+  min-height: 32px;
+  background: var(--color-canvas);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.broadcast-monitor-column .screen-container {
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+/* Horizontal Broadcast Master Timing Bar */
+.broadcast-timing-section {
+  padding: 6px 10px;
+  margin: 0 8px 6px 8px;
+  background: var(--color-field);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+}
+
+.broadcast-timing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timing-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.timing-box.elapsed {
+  align-items: flex-start;
+}
+
+.timing-box.remaining {
+  align-items: flex-end;
+}
+
+.timing-box .timing-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.timing-box .timing-val {
+  font-family: var(--font-family-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+
+.timing-box .remaining-val {
+  color: var(--color-primary);
+}
+
+.timing-box.near-end-alert .remaining-val {
+  color: var(--apple-red);
+}
+
+.timing-alert-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 69, 58, 0.15);
+  border: 1px solid rgba(255, 69, 58, 0.4);
+  color: #ff453a;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.controls-secondary-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}

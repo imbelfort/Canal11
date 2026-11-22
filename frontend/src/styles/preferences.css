@@ -1,0 +1,77 @@
+/* =====================================================================
+   SISTEMA DE PREFERENCIAS VISUALES HEREDADAS (CANAL 11 - GRUPO 12 SC)
+   - 3 Paletas personalizadas: Broadcast Blue, Cyber Emerald, Sunset Amber
+   - Modo Oscuro / Modo Claro
+   - 3 Tamaños de fuente escalables con herencia limpia en rem/em
+   ===================================================================== */
+
+/* 1. TAMAÑOS DE FUENTE ESCALABLES HEREDADOS */
+:root[data-font-size="sm"] {
+  font-size: 13px;
+}
+:root,
+:root[data-font-size="md"] {
+  font-size: 14.5px;
+}
+:root[data-font-size="lg"] {
+  font-size: 16.5px;
+}
+
+/* 2. PALETA 1: BROADCAST BLUE (Predeterminada) */
+:root[data-palette="default"],
+:root[data-palette="broadcast-blue"] {
+  --primary: #0b57d0;
+  --primary-hover: #0842a0;
+  --accent: #2563eb;
+  --accent-glow: rgba(37, 99, 235, 0.35);
+  --badge-border: #3b82f6;
+}
+
+/* 3. PALETA 2: CYBER EMERALD (Control Técnico QC & Master) */
+:root[data-palette="cyber-emerald"] {
+  --primary: #059669;
+  --primary-hover: #047857;
+  --accent: #10b981;
+  --accent-glow: rgba(16, 185, 129, 0.35);
+  --badge-border: #10b981;
+}
+:root[data-palette="cyber-emerald"] [data-theme="dark"] .brand-logo-badge,
+:root[data-palette="cyber-emerald"] .brand-logo-badge {
+  background: linear-gradient(135deg, #059669, #10b981) !important;
+}
+
+/* 4. PALETA 3: SUNSET AMBER (Programación Dinámica & Comercial) */
+:root[data-palette="sunset-amber"] {
+  --primary: #d97706;
+  --primary-hover: #b45309;
+  --accent: #f59e0b;
+  --accent-glow: rgba(245, 158, 11, 0.35);
+  --badge-border: #f59e0b;
+}
+:root[data-palette="sunset-amber"] [data-theme="dark"] .brand-logo-badge,
+:root[data-palette="sunset-amber"] .brand-logo-badge {
+  background: linear-gradient(135deg, #d97706, #f59e0b) !important;
+}
+
+/* Ajustes globales para consistencia de tema */
+.config-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.config-modal-card {
+  background: var(--color-canvas-soft, #1e293b);
+  border: 1px solid var(--color-hairline, #334155);
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  color: var(--color-ink, #f8fafc);
+}

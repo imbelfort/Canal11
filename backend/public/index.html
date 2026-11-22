@@ -1,0 +1,1799 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canal 11 - BMS Playout Automation | Grupo 12 SC</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./css/style.css">
+  <style>
+    :root {
+      --primary: #0b57d0;
+      --primary-hover: #0842a0;
+      --accent: #2563eb;
+      --bg-dark: #0f172a;
+      --card-dark: #1e293b;
+      --border-dark: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    body {
+      margin: 0;
+      font-family: 'Roboto', sans-serif;
+      background: var(--color-canvas, #0f172a);
+      color: var(--color-ink, #f8fafc);
+      overflow-x: hidden;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    /* Topbar de Playout y Buscador Universal Gmail Style */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 16px;
+      background: var(--color-canvas-soft, #1e293b);
+      border-bottom: 1px solid var(--color-hairline, #334155);
+      gap: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 260px;
+    }
+    .brand-logo-badge {
+      background: linear-gradient(135deg, #ba1a1a, #dc2626);
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 8px rgba(220, 38, 38, 0.4);
+    }
+    .brand-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .brand-title {
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--color-ink, #fff);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .brand-sub {
+      font-size: 11px;
+      color: var(--color-text-muted, #94a3b8);
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    /* Universal Gmail-Like Search Bar */
+    .search-container {
+      flex: 1;
+      max-width: 650px;
+      position: relative;
+    }
+    .search-bar {
+      display: flex;
+      align-items: center;
+      background: var(--color-field, #0f172a);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 28px;
+      padding: 6px 16px;
+      transition: all 0.2s ease;
+    }
+    .search-bar:focus-within {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+      background: var(--color-canvas-soft, #1e293b);
+    }
+    .search-bar input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      color: inherit;
+      font-size: 13.5px;
+      outline: none;
+      padding: 4px 8px;
+    }
+    .search-bar input::placeholder {
+      color: var(--color-text-muted, #64748b);
+    }
+    .search-icon {
+      color: var(--color-text-muted, #94a3b8);
+      font-size: 16px;
+    }
+    .search-results-dropdown {
+      position: absolute;
+      top: 105%;
+      left: 0;
+      right: 0;
+      background: var(--color-canvas-soft, #1e293b);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      max-height: 420px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+    }
+    .search-item {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--color-hairline-soft, #334155);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .search-item:hover {
+      background: var(--color-field, #0f172a);
+    }
+    .search-item-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .search-item-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--color-ink, #f8fafc);
+    }
+    .search-item-sub {
+      font-size: 11px;
+      color: var(--color-text-muted, #94a3b8);
+    }
+    .search-category-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: var(--color-field, #334155);
+      color: #38bdf8;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Top actions, Theme and User Profile */
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .theme-toggle-btn {
+      background: var(--color-field, #0f172a);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 20px;
+      padding: 6px 12px;
+      color: var(--color-ink, #f8fafc);
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .theme-toggle-btn:hover {
+      background: var(--color-field-hover, #334155);
+    }
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 12px;
+      background: var(--color-field, #0f172a);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 24px;
+      font-size: 12px;
+    }
+    .user-avatar {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: #2563eb;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 11px;
+    }
+    .role-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .role-admin { background: rgba(220, 38, 38, 0.2); color: #f87171; border: 1px solid rgba(220, 38, 38, 0.4); }
+    .role-prog { background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); }
+    .role-qc { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+
+    /* Navigation Tabs */
+    .role-nav-bar {
+      display: flex;
+      align-items: center;
+      background: var(--color-canvas-soft, #1e293b);
+      border-bottom: 1px solid var(--color-hairline, #334155);
+      padding: 0 16px;
+      gap: 4px;
+      overflow-x: auto;
+    }
+    .nav-tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-muted, #94a3b8);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .nav-tab:hover {
+      color: var(--color-ink, #fff);
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .nav-tab.active {
+      color: #38bdf8;
+      border-bottom-color: #38bdf8;
+      font-weight: 600;
+    }
+
+    /* Main Container Views */
+    .main-workspace {
+      flex: 1;
+      padding: 16px;
+      max-width: 1600px;
+      margin: 0 auto;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .view-card {
+      background: var(--color-canvas-soft, #1e293b);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--color-hairline, #334155);
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Forms and Tables */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .form-group label {
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--color-text-muted, #94a3b8);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      background: var(--color-field, #0f172a);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 6px;
+      color: inherit;
+      padding: 8px 12px;
+      font-size: 13px;
+      outline: none;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: #3b82f6;
+    }
+    .btn-action {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-action:hover {
+      background: #1d4ed8;
+    }
+    .btn-secondary {
+      background: var(--color-field, #334155);
+      color: var(--color-ink, #f8fafc);
+      border: 1px solid var(--color-hairline, #475569);
+    }
+    .btn-secondary:hover {
+      background: var(--color-field-hover, #475569);
+    }
+
+    /* Data Tables */
+    .bms-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+    .bms-table th {
+      text-align: left;
+      padding: 10px 12px;
+      background: var(--color-field, #0f172a);
+      color: var(--color-text-muted, #94a3b8);
+      font-weight: 600;
+      border-bottom: 1px solid var(--color-hairline, #334155);
+    }
+    .bms-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--color-hairline-soft, #334155);
+    }
+    .bms-table tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    /* Stat Cards (Dashboard) */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--color-field, #0f172a);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-label {
+      font-size: 11px;
+      color: var(--color-text-muted, #94a3b8);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+    .stat-val {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--color-ink, #fff);
+    }
+
+    /* QR Code Display for PagoFacil */
+    .qr-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+    .qr-modal-card {
+      background: var(--color-canvas-soft, #1e293b);
+      border: 1px solid var(--color-hairline, #334155);
+      border-radius: 16px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+    .qr-img {
+      width: 220px;
+      height: 220px;
+      margin: 16px auto;
+      border-radius: 8px;
+      background: #fff;
+      padding: 8px;
+    }
+
+    /* Auth Modal */
+    .auth-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0f172a;
+      z-index: 5000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .auth-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- MODAL DE AUTENTICACION -->
+  <div id="authOverlay" class="auth-overlay">
+    <div class="auth-card">
+      <div style="text-align: center; margin-bottom: 24px;">
+        <span class="brand-logo-badge" style="font-size: 14px;">CANAL 11 HD</span>
+        <h2 style="margin: 12px 0 4px; font-size: 18px;">BMS Playout Master</h2>
+        <p style="margin: 0; font-size: 12px; color: #94a3b8;">Sistema de Emisión y Automatización - Grupo 12 SC</p>
+      </div>
+
+      <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 10px; margin-bottom: 20px; font-size: 11.5px;">
+        <strong>Credenciales de Prueba por Rol:</strong><br>
+        • Admin: <code>admin</code> / <code>admin123</code><br>
+        • Programador: <code>programador</code> / <code>prog123</code><br>
+        • QC / Contenidos: <code>contenidos</code> / <code>cont123</code>
+      </div>
+
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label>Usuario o Correo Institucional</label>
+          <input type="text" id="loginUser" required placeholder="admin o admin@tecnoweb.org.bo" value="admin">
+        </div>
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label>Contraseña</label>
+          <input type="password" id="loginPass" required placeholder="••••••••" value="admin123">
+        </div>
+        <button type="submit" class="btn-action" style="width: 100%; justify-content: center; padding: 10px;">
+          Iniciar Sesión
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOPBAR PRINCIPAL CON BUSCADOR TIPO GMAIL -->
+  <header class="app-header">
+    <div class="brand-section">
+      <span class="brand-logo-badge">GRUPO 12 SC</span>
+      <div class="brand-info">
+        <span class="brand-title">Canal 11 Playout BMS</span>
+        <span class="brand-sub">PostgreSQL • Laravel 12 API</span>
+      </div>
+    </div>
+
+    <!-- Buscador Universal Tipo Gmail -->
+    <div class="search-container">
+      <div class="search-bar">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="universalSearchInput" placeholder="Buscar programas, clientes, spots, materiales MAM, auditoría..." autocomplete="off" oninput="handleUniversalSearch(this.value)">
+      </div>
+      <div id="searchResultsDropdown" class="search-results-dropdown"></div>
+    </div>
+
+    <!-- Acciones, Modo Noche y Perfil -->
+    <div class="top-actions">
+      <!-- Selector de Tema (Modo Noche / Claro) -->
+      <button class="theme-toggle-btn" onclick="toggleTheme()" title="Cambiar Tema (Modo Noche / Claro)">
+        <span id="themeIcon">☀️</span>
+        <span id="themeLabel">Modo Claro</span>
+      </button>
+
+      <!-- Pill de Usuario y Rol -->
+      <div class="user-pill" id="userProfilePill">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div style="display: flex; flex-direction: column;">
+          <strong id="userName" style="font-size: 11.5px;">Administrador</strong>
+          <span class="role-badge role-admin" id="userRoleBadge">ADMINISTRADOR</span>
+        </div>
+        <button onclick="handleLogout()" title="Cerrar Sesión" style="background: transparent; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; font-size: 14px;">✕</button>
+      </div>
+    </div>
+  </header>
+
+    <!-- NAVEGACION DE VISTAS POR ROL -->
+    <nav class="role-nav-bar" id="roleNavBar">
+      <!-- Visible para todos según rol -->
+      <button class="nav-tab active" data-view="dashboard" onclick="switchView('dashboard')">Panel General</button>
+      
+      <!-- ROL ADMINISTRADOR (CU1, Auditoría, Reportes) -->
+      <button class="nav-tab role-only-admin" data-view="usuarios" onclick="switchView('usuarios')">Usuarios y Roles (CU1)</button>
+      <button class="nav-tab role-only-admin" data-view="auditoria" onclick="switchView('auditoria')">Bitacora Auditoria (CU7)</button>
+      
+      <!-- ROL PROGRAMADOR (CU2, CU3, CU6) -->
+      <button class="nav-tab role-only-prog" data-view="catalogo" onclick="switchView('catalogo')">Catalogo Programas (CU2)</button>
+      <button class="nav-tab role-only-prog" data-view="parrilla" onclick="switchView('parrilla')">Parrilla y Rundown (CU3)</button>
+      <button class="nav-tab role-only-prog" data-view="clientes" onclick="switchView('clientes')">Clientes y Spots (CU6)</button>
+      <button class="nav-tab role-only-prog" data-view="pautas" onclick="switchView('pautas')">Pauta de Emision (CU6)</button>
+      <button class="nav-tab role-only-prog" data-view="pagos" onclick="switchView('pagos')">Modulo PagoFacil QR</button>
+
+      <!-- ROL ENCARGADO CONTENIDOS / QC (CU4, CU5, CU7) -->
+      <button class="nav-tab role-only-qc" data-view="mam" onclick="switchView('mam')">MAM - Materiales Video (CU4)</button>
+      <button class="nav-tab role-only-qc" data-view="qc" onclick="switchView('qc')">Control Calidad QC (CU5)</button>
+      <button class="nav-tab role-only-qc" data-view="emision" onclick="switchView('emision')">As-Run Log / Emision Real (CU7)</button>
+    </nav>
+
+  <!-- CONTENIDO DE LAS VISTAS MODULARES -->
+  <main class="main-workspace">
+
+    <!-- 1. VISTA DASHBOARD -->
+    <section id="view-dashboard" class="bms-view">
+      <div class="stats-row" id="statsContainer">
+        <!-- Render dinámico desde API -->
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📡 Programación de Hoy en Aire (Rundown Activo)</span>
+          <button class="btn-action btn-secondary" onclick="loadParrillaHoy()">Refrescar Rundown</button>
+        </div>
+        <div id="parrillaHoyContent">Cargando grilla del día...</div>
+      </div>
+    </section>
+
+    <!-- 2. VISTA CU1: USUARIOS Y ROLES (ADMIN) -->
+    <section id="view-usuarios" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">➕ Alta de Nuevo Personal del Canal (CU1)</span>
+        </div>
+        <form id="formUsuario" onsubmit="handleCreateUsuario(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nombres</label>
+              <input type="text" id="uNombre" required placeholder="Carlos">
+            </div>
+            <div class="form-group">
+              <label>Apellidos</label>
+              <input type="text" id="uApellidos" required placeholder="Roca Arteaga">
+            </div>
+            <div class="form-group">
+              <label>Cédula de Identidad (CI)</label>
+              <input type="text" id="uCi" required placeholder="4587123">
+            </div>
+            <div class="form-group">
+              <label>Correo Electrónico</label>
+              <input type="email" id="uEmail" required placeholder="operador@canal11.bo">
+            </div>
+            <div class="form-group">
+              <label>Contraseña</label>
+              <input type="password" id="uPass" required placeholder="••••••••">
+            </div>
+            <div class="form-group">
+              <label>Rol Asignado</label>
+              <select id="uRol">
+                <option value="1">ADMINISTRADOR</option>
+                <option value="2" selected>PROGRAMADOR</option>
+                <option value="3">ENCARGADO_CONTENIDOS (QC)</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Registrar Operador</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">👥 Plantel de Operadores del Sistema</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Operador</th>
+              <th>CI</th>
+              <th>Correo</th>
+              <th>Roles</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tablaUsuariosBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. VISTA CU2: CATALOGO DE PROGRAMAS (PROGRAMADOR) -->
+    <section id="view-catalogo" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">➕ Registrar Programa en el Catálogo (CU2)</span>
+        </div>
+        <form id="formPrograma" onsubmit="handleCreatePrograma(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Título del Programa</label>
+              <input type="text" id="pTitulo" required placeholder="Ej. Noticiero Meridiano">
+            </div>
+            <div class="form-group">
+              <label>Categoría</label>
+              <select id="pCategoria">
+                <option value="1">NOTICIAS</option>
+                <option value="2">DEPORTES</option>
+                <option value="3">TELENOVELA</option>
+                <option value="4">ENTRETENIMIENTO</option>
+                <option value="5">DOCUMENTAL</option>
+                <option value="6">INFANTIL</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Duración Estándar (Minutos)</label>
+              <input type="number" id="pDuracion" required value="60" min="5" max="360">
+            </div>
+            <div class="form-group">
+              <label>Clasificación de Edad</label>
+              <select id="pClasif">
+                <option value="ATP">ATP (Todo Público)</option>
+                <option value="TEEN_14">TEEN_14 (+14 Años)</option>
+                <option value="ADULTO_18">ADULTO_18 (+18 Años)</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Guardar en Catálogo</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📚 Catálogo Activo de Contenidos</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Título</th>
+              <th>Categoría</th>
+              <th>Clasificación</th>
+              <th>Duración Nominal</th>
+              <th>Origen</th>
+              <th>Materiales MAM</th>
+            </tr>
+          </thead>
+          <tbody id="tablaProgramasBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. VISTA CU3: PARRILLA DE PROGRAMACION (PROGRAMADOR) -->
+    <section id="view-parrilla" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">➕ Asignar Bloque Horario a la Parrilla (CU3 Escaleta)</span>
+        </div>
+        <form id="formItemParrilla" onsubmit="handleCreateItemParrilla(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Programa a Emitir</label>
+              <select id="ipPrograma"></select>
+            </div>
+            <div class="form-group">
+              <label>Hora Inicio (24h)</label>
+              <input type="time" id="ipHoraInicio" required value="14:00">
+            </div>
+            <div class="form-group">
+              <label>Hora Fin (24h)</label>
+              <input type="time" id="ipHoraFin" required value="15:00">
+            </div>
+            <div class="form-group">
+              <label>Tipo de Emisión</label>
+              <select id="ipTipo">
+                <option value="VIVO">VIVO (Directo)</option>
+                <option value="GRABADO" selected>GRABADO (Archivo MAM)</option>
+                <option value="REPETICION">REPETICIÓN</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Insertar Bloque en Parrilla</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📅 Escaleta Diaria de Emisión (Rundown Completo)</span>
+          <button class="btn-action btn-secondary" onclick="aprobarParrillaActual()">Aprobar Parrilla Oficialmente</button>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Horario</th>
+              <th>Programa</th>
+              <th>Tipo</th>
+              <th>Estado Emisión</th>
+              <th>Validación QC</th>
+              <th>Pautas Comerciales</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tablaParrillaItemsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. VISTA CLIENTES Y SPOTS (CU6 - VENTANA SEPARADA) -->
+    <section id="view-clientes" class="bms-view" style="display: none;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+        <!-- Nuevo Cliente -->
+        <div class="view-card">
+          <div class="card-header">
+            <span class="card-title">Registro de Anunciante Publicitario</span>
+          </div>
+          <form onsubmit="handleCreateCliente(event)">
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Razon Social / Empresa</label>
+              <input type="text" id="cliRazon" required placeholder="Cerveceria Boliviana Nacional S.A.">
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>NIT / Registro Tributario</label>
+              <input type="text" id="cliNit" required placeholder="1020304050">
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Contacto y Telefono</label>
+              <input type="text" id="cliContacto" placeholder="Lic. Rodrigo Banegas - 70012345">
+            </div>
+            <button type="submit" class="btn-action">Guardar Anunciante</button>
+          </form>
+        </div>
+
+        <!-- Nuevo Spot Vinculado -->
+        <div class="view-card">
+          <div class="card-header">
+            <span class="card-title">Vincular Spot Comercial al Cliente (Seleccion de Video)</span>
+          </div>
+          <form onsubmit="handleCreateSpot(event)">
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Cliente Anunciante Titular</label>
+              <select id="spotClienteSelect"></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Seleccionar Archivo de Spot (*.mp4, *.mov, *.mxf)</label>
+              <input type="file" id="spotFileInput" accept="video/*,.mp4,.mov,.mxf" onchange="autoExtractSpotMetadata(this)">
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Titulo Comercial / Campana</label>
+              <input type="text" id="spotTitulo" required placeholder="Se extrae del archivo o ingrese nombre">
+            </div>
+            <div class="form-group" style="margin-bottom: 10px;">
+              <label>Duracion Exacta Detectada (Segundos)</label>
+              <input type="number" id="spotDuracion" required value="30" min="5" max="180">
+            </div>
+            <button type="submit" class="btn-action">Vincular Spot al Cliente</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">Cartera de Clientes Anunciantes y sus Spots</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Razon Social</th>
+              <th>NIT</th>
+              <th>Contacto</th>
+              <th>Spots Activos</th>
+              <th>Acciones Rapidas</th>
+            </tr>
+          </thead>
+          <tbody id="tablaClientesDetalladosBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. VISTA PAUTA DE EMISION (CU6 - VENTANA SEPARADA) -->
+    <section id="view-pautas" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">Insertar Spot en Tanda de Transmision (Pauta Comercial)</span>
+        </div>
+        <form onsubmit="handleCreatePauta(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Bloque Horario de Parrilla</label>
+              <select id="pautaItemSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Spot Comercial del Cliente</label>
+              <select id="pautaSpotSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Tanda del Bloque</label>
+              <select id="pautaTanda">
+                <option value="CORTE_1">CORTE_1</option>
+                <option value="CORTE_2">CORTE_2</option>
+                <option value="CORTE_3">CORTE_3</option>
+                <option value="INICIO_PROGRAMA">INICIO_PROGRAMA</option>
+                <option value="FIN_PROGRAMA">FIN_PROGRAMA</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Orden en la Tanda</label>
+              <input type="number" id="pautaOrden" value="1" min="1" max="10">
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Insertar en Pauta</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">Pautas Comerciales en la Parrilla</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Programa Emisor</th>
+              <th>Spot Comercial</th>
+              <th>Anunciante</th>
+              <th>Tanda</th>
+              <th>Orden</th>
+              <th>Duracion</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPautasBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. VISTA MODULO PAGOFACIL QR (MODULAR) -->
+    <section id="view-pagos" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">💳 Módulo de Pagos PagoFácil Bolivia (Generador QR)</span>
+        </div>
+        <form onsubmit="handleGenerarPagoQr(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Cliente Anunciante</label>
+              <select id="pagoClienteSelect" required></select>
+            </div>
+            <div class="form-group">
+              <label>Spot Asociado (Opcional)</label>
+              <select id="pagoSpotSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Monto a Cobrar (BOB)</label>
+              <input type="number" id="pagoMonto" required step="0.5" value="500.00" min="10">
+            </div>
+            <div class="form-group">
+              <label>Concepto de Facturación</label>
+              <input type="text" id="pagoConcepto" required value="Pauta Publicitaria Televisiva Canal 11">
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Generar Código QR PagoFácil</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📜 Historial de Cobros y Transacciones PagoFácil</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>ID Transacción</th>
+              <th>Cliente</th>
+              <th>Monto</th>
+              <th>Concepto</th>
+              <th>Estado</th>
+              <th>Fecha</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPagosBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 7. VISTA CU4: MAM - MATERIALES DE VIDEO (QC/CONTENIDOS) -->
+    <section id="view-mam" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📁 Ingesta Automática de Video (CU4 MAM - Selección Directa de Archivo)</span>
+        </div>
+        <form onsubmit="handleCreateMaterial(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Seleccionar Archivo de Video (*.mp4, *.mxf, *.mov, *.ts, *.mkv)</label>
+              <input type="file" id="mFileInput" accept="video/*,.mxf,.ts,.mp4,.mov,.mkv" onchange="autoExtractVideoMetadata(this)" style="padding: 6px; cursor: pointer;">
+              <small style="color: #38bdf8; font-size: 11px;">El software extrae automáticamente el nombre, extensión, ruta y duración sin tipeo manual.</small>
+            </div>
+            <div class="form-group">
+              <label>Programa Asociado</label>
+              <select id="mProgramaSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Título / Nombre Detectado</label>
+              <input type="text" id="mTitulo" required placeholder="Se extrae automáticamente al seleccionar archivo" readonly style="opacity: 0.85;">
+            </div>
+            <div class="form-group">
+              <label>Duración Detectada (Segundos)</label>
+              <input type="number" id="mDuracion" required value="3600" min="1" readonly style="opacity: 0.85;">
+            </div>
+            <div class="form-group">
+              <label>Formato y Contenedor</label>
+              <select id="mFormato">
+                <option value="HD_1080I">HD 1080i (Broadcast Master)</option>
+                <option value="HD_720P">HD 720p</option>
+                <option value="4K_UHD">4K UHD</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Ruta / Storage Servidor MAM</label>
+              <input type="text" id="mRutaStorage" placeholder="Ruta generada automáticamente por el storage MAM" readonly style="opacity: 0.85;">
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Ingestar en Servidor MAM</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📼 Activos Digitales Ingestados en Almacenamiento MAM</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Código MAM</th>
+              <th>Clip</th>
+              <th>Programa</th>
+              <th>Duración</th>
+              <th>Formato</th>
+              <th>Estado Ingesta</th>
+              <th>Ruta Storage</th>
+            </tr>
+          </thead>
+          <tbody id="tablaMaterialesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 8. VISTA CU5: CONTROL DE CALIDAD QC (QC/CONTENIDOS) -->
+    <section id="view-qc" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">🔍 Inspección Técnica Previa a Emisión (CU5 Calidad QC)</span>
+        </div>
+        <form onsubmit="handleValidarQC(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Bloque de Parrilla a Inspeccionar</label>
+              <select id="qcItemSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Veredicto Técnico (Norma EBU R128)</label>
+              <select id="qcVeredicto">
+                <option value="APROBADO_AIRE">APROBADO_AIRE (Apto para Transmisión)</option>
+                <option value="RECHAZADO_FALLA_AUDIO">RECHAZADO_FALLA_AUDIO (Nivel LUFS Inválido)</option>
+                <option value="RECHAZADO_FALLA_VIDEO">RECHAZADO_FALLA_VIDEO (Aspect Ratio / Glitch)</option>
+                <option value="OBSERVADO">OBSERVADO (Requiere Revisión)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nivel de Sonoridad (dB / LUFS)</label>
+              <input type="number" id="qcNivelAudio" value="-24.0" step="0.1">
+            </div>
+            <div class="form-group">
+              <label>Observaciones Técnicas</label>
+              <input type="text" id="qcObs" placeholder="Inspección de luminancia y sonoridad conforme">
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Registrar Certificación QC</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📋 Registro Histórico de Certificaciones QC</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Item Evaluado</th>
+              <th>Veredicto QC</th>
+              <th>Nivel Audio dB</th>
+              <th>Aspect Ratio</th>
+              <th>Inspector QC</th>
+              <th>Fecha Certificación</th>
+            </tr>
+          </thead>
+          <tbody id="tablaValidacionesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 9. VISTA CU7: AS-RUN LOG (EMISION REAL) -->
+    <section id="view-emision" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📡 Conciliación Legal de Salida al Aire (CU7 As-Run Log)</span>
+        </div>
+        <form onsubmit="handleConciliarEmision(event)">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Bloque Horario Transmitido</label>
+              <select id="emisionItemSelect"></select>
+            </div>
+            <div class="form-group">
+              <label>Discrepancia de Transmisión (Segundos)</label>
+              <input type="number" id="emisionDiscrepancia" value="0">
+            </div>
+            <div class="form-group">
+              <label>Estado Técnico de la Emisión</label>
+              <select id="emisionEstado">
+                <option value="EMITIDO_CORRECTO">EMITIDO_CORRECTO (A Tiempo)</option>
+                <option value="DESPLAZADO">DESPLAZADO (Retraso Justificado)</option>
+                <option value="FALLA_TECNICA">FALLA_TECNICA</option>
+                <option value="INTERRUPCION_NOTICIOSA">INTERRUPCION_NOTICIOSA</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn-action">Conciliar Legalmente en Bitácora</button>
+        </form>
+      </div>
+
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">📜 Bitácora Notariada de Transmisión Real (As-Run Log)</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Hora Inicio Real</th>
+              <th>Hora Fin Real</th>
+              <th>Programa</th>
+              <th>Discrepancia</th>
+              <th>Estado Emisión</th>
+              <th>Operador de Turno</th>
+            </tr>
+          </thead>
+          <tbody id="tablaEmisionesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 10. VISTA AUDITORIA (ADMIN) -->
+    <section id="view-auditoria" class="bms-view" style="display: none;">
+      <div class="view-card">
+        <div class="card-header">
+          <span class="card-title">🛡️ Auditoría Integral de Acciones (Seguridad y Trazabilidad)</span>
+        </div>
+        <table class="bms-table">
+          <thead>
+            <tr>
+              <th>Fecha y Hora</th>
+              <th>Usuario</th>
+              <th>Tabla Afectada</th>
+              <th>Operación</th>
+              <th>Detalle del Evento</th>
+            </tr>
+          </thead>
+          <tbody id="tablaAuditoriaBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL VISOR QR DE PAGOFACIL -->
+  <div id="qrModal" class="qr-modal" onclick="cerrarQrModal(event)">
+    <div class="qr-modal-card" onclick="event.stopPropagation()">
+      <h3 style="margin-top: 0; color: #38bdf8;">Código QR - PagoFácil Bolivia</h3>
+      <p id="qrConcepto" style="font-size: 13px; color: var(--color-text-muted);"></p>
+      <img id="qrImageElement" class="qr-img" src="" alt="QR PagoFacil">
+      <div style="font-size: 18px; font-weight: 700; color: #4ade80; margin-bottom: 12px;" id="qrMonto"></div>
+      <div style="display: flex; gap: 8px; justify-content: center;">
+        <button class="btn-action" onclick="simularPagoExitoso()">Confirmar Pago (Simulación)</button>
+        <button class="btn-action btn-secondary" onclick="cerrarQrModal()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLADOR CLIENTE JAVASCRIPT INTEGRADO -->
+  <script>
+    const API_BASE = 'http://127.0.0.1:8000/api';
+    let currentUser = null;
+    let authToken = localStorage.getItem('playout_token') || null;
+    let activeQrTxId = null;
+
+    // 1. GESTION DE TEMA (MODO NOCHE / CLARO)
+    function initTheme() {
+      const savedTheme = localStorage.getItem('playout_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+      updateThemeUI(savedTheme);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('playout_theme', next);
+      updateThemeUI(next);
+    }
+
+    function updateThemeUI(theme) {
+      const icon = document.getElementById('themeIcon');
+      const label = document.getElementById('themeLabel');
+      if (theme === 'dark') {
+        icon.textContent = '🌙';
+        label.textContent = 'Modo Noche';
+      } else {
+        icon.textContent = '☀️';
+        label.textContent = 'Modo Claro';
+      }
+    }
+
+    // 2. BUSCADOR UNIVERSAL TIPO GMAIL
+    let searchDebounceTimer = null;
+    async function handleUniversalSearch(query) {
+      clearTimeout(searchDebounceTimer);
+      const dropdown = document.getElementById('searchResultsDropdown');
+      
+      if (!query || query.trim().length < 2) {
+        dropdown.style.display = 'none';
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      searchDebounceTimer = setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+          const data = await res.json();
+          renderSearchResults(data.results || []);
+        } catch (e) {
+          console.error('Error en búsqueda universal:', e);
+        }
+      }, 250);
+    }
+
+    function renderSearchResults(items) {
+      const dropdown = document.getElementById('searchResultsDropdown');
+      dropdown.innerHTML = '';
+
+      if (items.length === 0) {
+        dropdown.innerHTML = '<div style="padding: 12px; font-size: 12.5px; color: #94a3b8; text-align: center;">No se encontraron resultados coincidentes.</div>';
+        dropdown.style.display = 'block';
+        return;
+      }
+
+      items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'search-item';
+        div.innerHTML = `
+          <div class="search-item-info">
+            <span class="search-item-title">${item.title}</span>
+            <span class="search-item-sub">${item.subtitle}</span>
+          </div>
+          <span class="search-category-badge">${item.category}</span>
+        `;
+        div.onclick = () => {
+          dropdown.style.display = 'none';
+          if (item.type === 'PROGRAMA') switchView('catalogo');
+          else if (item.type === 'CLIENTE' || item.type === 'SPOT') switchView('comercial');
+          else if (item.type === 'MATERIAL_MAM') switchView('mam');
+          else if (item.type === 'USUARIO') switchView('usuarios');
+          else if (item.type === 'PARRILLA') switchView('parrilla');
+        };
+        dropdown.appendChild(div);
+      });
+
+      dropdown.style.display = 'block';
+    }
+
+    document.addEventListener('click', (e) => {
+      const container = document.querySelector('.search-container');
+      if (container && !container.contains(e.target)) {
+        document.getElementById('searchResultsDropdown').style.display = 'none';
+      }
+    });
+
+    // 3. AUTENTICACION Y CONTROL DE ROLES
+    async function handleLogin(e) {
+      e.preventDefault();
+      const login = document.getElementById('loginUser').value;
+      const password = document.getElementById('loginPass').value;
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ login, password })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          authToken = data.token;
+          currentUser = data.usuario;
+          localStorage.setItem('playout_token', authToken);
+          localStorage.setItem('playout_user', JSON.stringify(currentUser));
+          document.getElementById('authOverlay').style.display = 'none';
+          applyUserRolesUI();
+          loadAllData();
+        } else {
+          alert('Error: ' + data.message);
+        }
+      } catch (err) {
+        alert('Error conectando con la API: ' + err.message);
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('playout_token');
+      localStorage.removeItem('playout_user');
+      currentUser = null;
+      authToken = null;
+      document.getElementById('authOverlay').style.display = 'flex';
+    }
+
+    function applyUserRolesUI() {
+      if (!currentUser) return;
+      document.getElementById('userName').textContent = `${currentUser.nombre} ${currentUser.apellidos}`;
+      document.getElementById('userAvatar').textContent = currentUser.nombre.charAt(0);
+
+      const rolPrincipal = currentUser.rol_principal || (currentUser.roles ? currentUser.roles[0] : 'OPERADOR');
+      const badge = document.getElementById('userRoleBadge');
+      badge.textContent = rolPrincipal;
+
+      // Estilo según rol
+      badge.className = 'role-badge';
+      if (rolPrincipal.includes('ADMIN')) badge.classList.add('role-admin');
+      else if (rolPrincipal.includes('PROG')) badge.classList.add('role-prog');
+      else badge.classList.add('role-qc');
+
+      // Filtrar pestañas visibles según el rol del usuario
+      const isAdmin = currentUser.roles && currentUser.roles.some(r => r.includes('ADMIN'));
+      const isProg = currentUser.roles && currentUser.roles.some(r => r.includes('PROG'));
+      const isQC = currentUser.roles && currentUser.roles.some(r => r.includes('CONT') || r.includes('QC'));
+
+      document.querySelectorAll('.role-only-admin').forEach(el => el.style.display = isAdmin ? 'inline-flex' : 'none');
+      document.querySelectorAll('.role-only-prog').forEach(el => el.style.display = (isAdmin || isProg) ? 'inline-flex' : 'none');
+      document.querySelectorAll('.role-only-qc').forEach(el => el.style.display = (isAdmin || isQC) ? 'inline-flex' : 'none');
+    }
+
+    // 4. CAMBIO DE VISTAS
+    function switchView(viewName) {
+      document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.bms-view').forEach(v => v.style.display = 'none');
+
+      const targetTab = document.querySelector(`.nav-tab[data-view="${viewName}"]`);
+      if (targetTab) targetTab.classList.add('active');
+
+      const targetView = document.getElementById(`view-${viewName}`);
+      if (targetView) targetView.style.display = 'block';
+
+      // Cargas bajo demanda
+      if (viewName === 'dashboard') loadStats();
+      if (viewName === 'usuarios') loadUsuarios();
+      if (viewName === 'catalogo') loadProgramas();
+      if (viewName === 'parrilla') loadParrillaHoy();
+      if (viewName === 'clientes') loadClientes();
+      if (viewName === 'pautas') { loadPautas(); loadSpots(); loadParrillaHoy(); }
+      if (viewName === 'pagos') loadPagos();
+      if (viewName === 'mam') loadMateriales();
+      if (viewName === 'qc') loadValidaciones();
+      if (viewName === 'emision') loadEmisiones();
+      if (viewName === 'auditoria') loadAuditoria();
+    }
+
+    async function loadClientes() {
+      const res = await fetch(`${API_BASE}/v1/clientes`);
+      const list = await res.json();
+      const optHtml = list.map(c => `<option value="${c.id}">${c.razon_social} (NIT: ${c.nit})</option>`).join('');
+      const s1 = document.getElementById('spotClienteSelect');
+      if (s1) s1.innerHTML = optHtml;
+      const s2 = document.getElementById('pagoClienteSelect');
+      if (s2) s2.innerHTML = optHtml;
+
+      const tbody = document.getElementById('tablaClientesDetalladosBody');
+      if (tbody) {
+        tbody.innerHTML = list.map(c => {
+          const spotsList = c.spots && c.spots.length > 0 
+            ? c.spots.map(s => `<span class="role-badge role-prog" style="display:inline-block; margin:2px;">${s.codigo_spot} (${s.duracion_segundos}s)</span>`).join(' ')
+            : '<span style="color: #64748b; font-size:11px;">Sin spots vinculados</span>';
+          
+          return `
+            <tr>
+              <td>#${c.id}</td>
+              <td><strong>${c.razon_social}</strong></td>
+              <td>${c.nit}</td>
+              <td>${c.contacto || 'N/A'}</td>
+              <td>${spotsList}</td>
+              <td>
+                <button class="btn-action btn-secondary" style="padding: 3px 8px; font-size: 11px;" onclick="prepararSpotParaCliente(${c.id})">+ Spot</button>
+                <button class="btn-action" style="padding: 3px 8px; font-size: 11px; margin-left: 4px;" onclick="prepararPagoParaCliente(${c.id})">Cobrar QR</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      }
+    }
+
+    function prepararSpotParaCliente(clienteId) {
+      const select = document.getElementById('spotClienteSelect');
+      if (select) select.value = clienteId;
+      document.getElementById('spotFileInput').focus();
+    }
+
+    function prepararPagoParaCliente(clienteId) {
+      switchView('pagos');
+      const select = document.getElementById('pagoClienteSelect');
+      if (select) select.value = clienteId;
+    }
+
+    function autoExtractSpotMetadata(inputElement) {
+      const file = inputElement.files?.[0];
+      if (!file) return;
+
+      const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+      document.getElementById('spotTitulo').value = cleanName;
+
+      try {
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function() {
+          window.URL.revokeObjectURL(video.src);
+          if (video.duration && !isNaN(video.duration)) {
+            document.getElementById('spotDuracion').value = Math.round(video.duration);
+          }
+        };
+        video.src = URL.createObjectURL(file);
+      } catch (e) {
+        document.getElementById('spotDuracion').value = 30;
+      }
+    }
+
+    async function loadSpots() {
+      const res = await fetch(`${API_BASE}/v1/spots`);
+      const list = await res.json();
+      const optHtml = list.map(s => `<option value="${s.id}">${s.codigo_spot} - ${s.titulo_spot} (${s.duracion_segundos}s)</option>`).join('');
+      const s1 = document.getElementById('pautaSpotSelect');
+      if (s1) s1.innerHTML = optHtml;
+      const s2 = document.getElementById('pagoSpotSelect');
+      if (s2) s2.innerHTML = `<option value="">(Ninguno - Pago directo de cliente)</option>` + optHtml;
+    }
+
+    async function loadPautas() {
+      const res = await fetch(`${API_BASE}/v1/pautas`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaPautasBody');
+      tbody.innerHTML = list.map(p => `
+        <tr>
+          <td>${p.item_parrilla && p.item_parrilla.programa ? p.item_parrilla.programa.titulo : 'N/A'}</td>
+          <td><strong>${p.spot ? p.spot.codigo_spot : ''}</strong> - ${p.spot ? p.spot.titulo_spot : ''}</td>
+          <td>${p.spot && p.spot.cliente ? p.spot.cliente.razon_social : 'N/A'}</td>
+          <td><span class="role-badge role-prog">${p.tanda_bloque}</span></td>
+          <td>#${p.orden}</td>
+          <td>${p.spot ? p.spot.duracion_segundos : 30}s</td>
+          <td><span style="color: #4ade80;">${p.estado}</span></td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadMateriales() {
+      const res = await fetch(`${API_BASE}/v1/materiales`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaMaterialesBody');
+      tbody.innerHTML = list.map(m => `
+        <tr>
+          <td><strong style="color: #38bdf8;">${m.codigo_material}</strong></td>
+          <td>${m.titulo_clip}</td>
+          <td>${m.programa ? m.programa.titulo : 'N/A'}</td>
+          <td>${m.duracion_segundos}s (${Math.round(m.duracion_segundos/60)} min)</td>
+          <td>${m.formato} (${m.resolucion})</td>
+          <td><span class="role-badge role-qc">${m.estado}</span></td>
+          <td><code style="font-size: 11px;">${m.ruta_servidor}</code></td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadValidaciones() {
+      const res = await fetch(`${API_BASE}/v1/validaciones`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaValidacionesBody');
+      tbody.innerHTML = list.map(v => `
+        <tr>
+          <td>${v.item_parrilla && v.item_parrilla.programa ? v.item_parrilla.programa.titulo : 'Item #' + v.id_item_parrilla}</td>
+          <td><span class="role-badge" style="background: rgba(34,197,94,0.15); color: #4ade80;">${v.resultado_qc}</span></td>
+          <td>${v.nivel_audio_db} dB</td>
+          <td>${v.aspect_ratio}</td>
+          <td>${v.inspector ? v.inspector.nombre : 'Inspector QC'}</td>
+          <td>${v.fecha_validacion}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadEmisiones() {
+      const res = await fetch(`${API_BASE}/v1/emisiones`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaEmisionesBody');
+      tbody.innerHTML = list.map(e => `
+        <tr>
+          <td>${e.hora_inicio_real}</td>
+          <td>${e.hora_fin_real}</td>
+          <td>${e.item_parrilla && e.item_parrilla.programa ? e.item_parrilla.programa.titulo : 'Bloque #' + e.id_item_parrilla}</td>
+          <td><strong style="color: ${e.discrepancia_segundos === 0 ? '#4ade80' : '#f87171'}">${e.discrepancia_segundos}s</strong></td>
+          <td><span class="role-badge role-admin">${e.estado_emision}</span></td>
+          <td>${e.operador_emision}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadAuditoria() {
+      const res = await fetch(`${API_BASE}/v1/auditoria`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaAuditoriaBody');
+      tbody.innerHTML = list.map(a => `
+        <tr>
+          <td><small>${a.fecha_evento}</small></td>
+          <td><strong>${a.usuario ? a.usuario.nombre : 'Sistema'}</strong></td>
+          <td><code>${a.tabla_afectada}</code></td>
+          <td><span class="role-badge role-prog">${a.accion}</span></td>
+          <td>${a.detalle}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadPagos() {
+      const res = await fetch(`${API_BASE}/pagos`);
+      const list = await res.json();
+      const tbody = document.getElementById('tablaPagosBody');
+      tbody.innerHTML = list.map(p => `
+        <tr>
+          <td><code style="color: #38bdf8;">${p.transaccion_id}</code></td>
+          <td>${p.cliente ? p.cliente.razon_social : 'N/A'}</td>
+          <td><strong>${p.moneda} ${p.monto}</strong></td>
+          <td>${p.concepto}</td>
+          <td><span class="role-badge" style="background: ${p.estado === 'PAGADO' ? 'rgba(34,197,94,0.2)' : 'rgba(234,179,8,0.2)'}; color: ${p.estado === 'PAGADO' ? '#4ade80' : '#facc15'}">${p.estado}</span></td>
+          <td><small>${p.fecha_transaccion}</small></td>
+          <td>
+            ${p.estado === 'PENDIENTE' ? `<button class="btn-action" style="padding: 3px 8px; font-size: 11px;" onclick="verQrExistente('${p.transaccion_id}', '${p.qr_imagen}', '${p.monto}', '${p.concepto}')">Ver QR</button>` : '—'}
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Handlers de Formulario
+    async function handleCreateUsuario(e) {
+      e.preventDefault();
+      const body = {
+        nombre: document.getElementById('uNombre').value,
+        apellidos: document.getElementById('uApellidos').value,
+        ci: document.getElementById('uCi').value,
+        email: document.getElementById('uEmail').value,
+        password: document.getElementById('uPass').value,
+        rol_id: parseInt(document.getElementById('uRol').value)
+      };
+      const res = await fetch(`${API_BASE}/v1/usuarios`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Usuario creado con éxito!');
+        document.getElementById('formUsuario').reset();
+        loadUsuarios();
+      }
+    }
+
+    async function handleCreatePrograma(e) {
+      e.preventDefault();
+      const body = {
+        titulo: document.getElementById('pTitulo').value,
+        id_categoria: parseInt(document.getElementById('pCategoria').value),
+        duracion_estandar_minutos: parseInt(document.getElementById('pDuracion').value),
+        clasificacion_edad: document.getElementById('pClasif').value
+      };
+      const res = await fetch(`${API_BASE}/v1/programas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Programa creado exitosamente con código autogenerado: ${data.programa.codigo}`);
+        document.getElementById('formPrograma').reset();
+        loadProgramas();
+      }
+    }
+
+    async function handleCreateItemParrilla(e) {
+      e.preventDefault();
+      const body = {
+        id_parrilla: 1, // Parrilla activa
+        id_programa: parseInt(document.getElementById('ipPrograma').value),
+        hora_inicio: document.getElementById('ipHoraInicio').value,
+        hora_fin: document.getElementById('ipHoraFin').value,
+        tipo_emision: document.getElementById('ipTipo').value
+      };
+      const res = await fetch(`${API_BASE}/v1/items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Bloque agregado a la escaleta de emisión!');
+        loadParrillaHoy();
+      }
+    }
+
+    async function eliminarItemParrilla(id) {
+      if (!confirm('¿Desea quitar este bloque de la parrilla?')) return;
+      await fetch(`${API_BASE}/v1/items/${id}`, { method: 'DELETE' });
+      loadParrillaHoy();
+    }
+
+    async function aprobarParrillaActual() {
+      await fetch(`${API_BASE}/v1/parrillas/1/estado`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'APROBADA' })
+      });
+      alert('Parrilla diaria APROBADA oficialmente.');
+      loadParrillaHoy();
+    }
+
+    async function handleCreateCliente(e) {
+      e.preventDefault();
+      const body = {
+        razon_social: document.getElementById('cliRazon').value,
+        nit: document.getElementById('cliNit').value,
+        contacto: document.getElementById('cliContacto').value
+      };
+      const res = await fetch(`${API_BASE}/v1/clientes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Cliente anunciante guardado con éxito!');
+        loadClientes();
+      }
+    }
+
+    async function handleCreateSpot(e) {
+      e.preventDefault();
+      const body = {
+        id_cliente: parseInt(document.getElementById('spotClienteSelect').value),
+        titulo_spot: document.getElementById('spotTitulo').value,
+        duracion_segundos: parseInt(document.getElementById('spotDuracion').value)
+      };
+      const res = await fetch(`${API_BASE}/v1/spots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Spot publicitario registrado con código autogenerado: ${data.spot.codigo_spot}`);
+        loadSpots();
+      }
+    }
+
+    async function handleCreatePauta(e) {
+      e.preventDefault();
+      const body = {
+        id_item_parrilla: parseInt(document.getElementById('pautaItemSelect').value),
+        id_spot: parseInt(document.getElementById('pautaSpotSelect').value),
+        tanda_bloque: document.getElementById('pautaTanda').value,
+        orden: parseInt(document.getElementById('pautaOrden').value)
+      };
+      const res = await fetch(`${API_BASE}/v1/pautas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Spot pautado exitosamente en el bloque horario.');
+        loadPautas();
+        loadParrillaHoy();
+      }
+    }
+
+    // Extracción automática de metadatos de archivo de video (Cero Tipeo Manual)
+    function autoExtractVideoMetadata(inputElement) {
+      const file = inputElement.files?.[0];
+      if (!file) return;
+
+      const filename = file.name;
+      const cleanTitle = filename.replace(/\.[^/.]+$/, '');
+      const storagePath = (file.path || `/mam/storage/${filename}`).replace(/\\/g, '/');
+
+      document.getElementById('mTitulo').value = filename;
+      document.getElementById('mRutaStorage').value = storagePath;
+
+      // Detectar duración real usando objeto Video en memoria si el navegador lo soporta
+      try {
+        const videoObj = document.createElement('video');
+        videoObj.preload = 'metadata';
+        videoObj.onloadedmetadata = function() {
+          window.URL.revokeObjectURL(videoObj.src);
+          if (videoObj.duration && !isNaN(videoObj.duration)) {
+            document.getElementById('mDuracion').value = Math.round(videoObj.duration);
+          }
+        };
+        videoObj.src = URL.createObjectURL(file);
+      } catch (e) {
+        document.getElementById('mDuracion').value = 1800;
+      }
+    }
+
+    async function handleCreateMaterial(e) {
+      e.preventDefault();
+      const body = {
+        id_programa: parseInt(document.getElementById('mProgramaSelect').value),
+        titulo_clip: document.getElementById('mTitulo').value || 'Archivo_Video.mp4',
+        duracion_segundos: parseInt(document.getElementById('mDuracion').value) || 1800,
+        formato: document.getElementById('mFormato').value,
+        ruta_servidor: document.getElementById('mRutaStorage').value || null
+      };
+      const res = await fetch(`${API_BASE}/v1/materiales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert(`Material ingestado exitosamente con código MAM autogenerado: ${data.material.codigo_material}`);
+        document.getElementById('mFileInput').value = '';
+        document.getElementById('mTitulo').value = '';
+        document.getElementById('mRutaStorage').value = '';
+        loadMateriales();
+      }
+    }
+
+    async function handleValidarQC(e) {
+      e.preventDefault();
+      const body = {
+        id_item_parrilla: parseInt(document.getElementById('qcItemSelect').value),
+        resultado_qc: document.getElementById('qcVeredicto').value,
+        nivel_audio_db: parseFloat(document.getElementById('qcNivelAudio').value),
+        observaciones: document.getElementById('qcObs').value
+      };
+      const res = await fetch(`${API_BASE}/v1/validaciones`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Certificación de Calidad QC registrada en el bloque.');
+        loadValidaciones();
+        loadParrillaHoy();
+      }
+    }
+
+    async function handleConciliarEmision(e) {
+      e.preventDefault();
+      const body = {
+        id_item_parrilla: parseInt(document.getElementById('emisionItemSelect').value),
+        discrepancia_segundos: parseInt(document.getElementById('emisionDiscrepancia').value),
+        estado_emision: document.getElementById('emisionEstado').value
+      };
+      const res = await fetch(`${API_BASE}/v1/emisiones/conciliar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Salida al aire conciliada legalmente en el As-Run Log.');
+        loadEmisiones();
+      }
+    }
+
+    // Módulo PagoFácil QR
+    async function handleGenerarPagoQr(e) {
+      e.preventDefault();
+      const spotVal = document.getElementById('pagoSpotSelect').value;
+      const body = {
+        id_cliente: parseInt(document.getElementById('pagoClienteSelect').value),
+        id_spot: spotVal ? parseInt(spotVal) : null,
+        monto: parseFloat(document.getElementById('pagoMonto').value),
+        concepto: document.getElementById('pagoConcepto').value
+      };
+
+      const res = await fetch(`${API_BASE}/pagos/generar-qr`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        activeQrTxId = data.transaccion_id;
+        document.getElementById('qrConcepto').textContent = body.concepto;
+        document.getElementById('qrMonto').textContent = `Total: Bs. ${data.monto}`;
+        document.getElementById('qrImageElement').src = data.qr_imagen;
+        document.getElementById('qrModal').style.display = 'flex';
+        loadPagos();
+      }
+    }
+
+    function verQrExistente(txId, qrImg, monto, concepto) {
+      activeQrTxId = txId;
+      document.getElementById('qrConcepto').textContent = concepto;
+      document.getElementById('qrMonto').textContent = `Total: Bs. ${monto}`;
+      document.getElementById('qrImageElement').src = qrImg;
+      document.getElementById('qrModal').style.display = 'flex';
+    }
+
+    function cerrarQrModal(e) {
+      document.getElementById('qrModal').style.display = 'none';
+      activeQrTxId = null;
+    }
+
+    async function simularPagoExitoso() {
+      if (!activeQrTxId) return;
+      const res = await fetch(`${API_BASE}/pagos/confirmar/${activeQrTxId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ estado: 'PAGADO_CONFIRMADO' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('¡Pago confirmado con éxito vía PagoFácil!');
+        cerrarQrModal();
+        loadPagos();
+        loadStats();
+      }
+    }
+
+    function loadAllData() {
+      loadStats();
+      loadParrillaHoy();
+      loadProgramas();
+      loadClientes();
+      loadSpots();
+    }
+
+    // Inicialización al cargar la página
+    window.addEventListener('DOMContentLoaded', () => {
+      initTheme();
+      const savedUser = localStorage.getItem('playout_user');
+      if (savedUser && authToken) {
+        try {
+          currentUser = JSON.parse(savedUser);
+          document.getElementById('authOverlay').style.display = 'none';
+          applyUserRolesUI();
+          loadAllData();
+        } catch (e) {
+          document.getElementById('authOverlay').style.display = 'flex';
+        }
+      } else {
+        document.getElementById('authOverlay').style.display = 'flex';
+      }
+    });
+  </script>
+</body>
+</html>

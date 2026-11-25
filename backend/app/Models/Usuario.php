@@ -38,6 +38,16 @@ class Usuario extends Authenticatable
         return $this->belongsToMany(Rol::class, 'usuario_roles', 'id_usuario', 'id_rol');
     }
 
+    public function canScheduleParrilla(): bool
+    {
+        return $this->roles()->whereIn('nombre', ['ADMINISTRADOR', 'PROGRAMADOR'])->exists();
+    }
+
+    public function canIngestMedia(): bool
+    {
+        return $this->roles()->whereIn('nombre', ['ADMINISTRADOR', 'ENCARGADO_CONTENIDOS'])->exists();
+    }
+
     public function getAuthPassword()
     {
         return $this->password;

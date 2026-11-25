@@ -1,15 +1,21 @@
+import { requestJson } from './api/client';
+
 export interface MediaQuality {
   status: 'APROBADO_TECNICO' | 'OBSERVADO' | 'PENDIENTE';
   checked_at: string;
   issues: string[];
   duration_ms?: number;
-  video?: { codec_name?: string; width?: number; height?: number; avg_frame_rate?: string } | null;
+  size_bytes?: number;
+  extension?: string;
+  format_name?: string | null;
+  bit_rate?: number | null;
+  video?: { codec_name?: string; width?: number; height?: number; avg_frame_rate?: string; bit_rate?: string } | null;
   audio?: { codec_name?: string; channels?: number; sample_rate?: string } | null;
 }
 
 export const qualityLabels = {
   APROBADO_TECNICO: 'Aprobado técnico',
-  OBSERVADO: 'Observado',
+  OBSERVADO: 'Rechazado',
   PENDIENTE: 'Pendiente',
 };
 
@@ -19,6 +25,12 @@ export interface CatalogFile {
   ruta: string;
   duracion_ms: number;
   origen: string;
+  disponible?: boolean;
+  estado_mam?: string;
+  formato?: string;
+  resolucion?: string;
+  observaciones?: string | null;
+  nota_qc?: string | null;
   qc?: MediaQuality | null;
 }
 
@@ -91,4 +103,56 @@ export async function uploadCatalogVideo(
     resetWait(60_000);
     xhr.send(form);
   });
+}
+
+export function searchCatalogVideos(query: string, signal?: AbortSignal) {
+  return requestJson<CatalogFile[]>(`/api/parrilla/archivos?q=${encodeURIComponent(query)}`, { headers: mediaHeaders(), signal });
+}
+
+export function isReadyCatalogVideo(file: CatalogFile) {
+  return file.disponible ?? (file.id.startsWith('mam:') || file.qc?.status === 'APROBADO_TECNICO');
+}
+
+export type AnalysisProgress = {
+  percent: number;
+  stage: 'starting' | 'checking' | 'reading' | 'saving';
+};
+
+type AnalysisEvent<File> =
+  | (AnalysisProgress & { type: 'progress' })
+  | { type: 'done'; file: File }
+  | { type: 'error' };
+
+export async function reanalyzeCatalogVideo<File>(id: number, onProgress: (progress: AnalysisProgress) => void): Promise<File> {
+  const response = await fetch(`/api/parrilla/qc/${id}`, {
+    method: 'POST',
+    headers: { ...mediaHeaders(), Accept: 'application/x-ndjson' },
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!response.ok || !response.body) {
+    throw new Error(response.status === 401 ? 'Tu sesión expiró. Vuelve a iniciar sesión.' : 'No se pudo iniciar el análisis.');
+  }
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += chunk.value;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const event = JSON.parse(line) as AnalysisEvent<File>;
+        if (event.type === 'progress') onProgress(event);
+        if (event.type === 'done') return event.file;
+        if (event.type === 'error') throw new Error('No se pudo guardar el resultado del análisis.');
+      }
+    }
+    throw new Error('Se perdió la respuesta del análisis. Actualiza el catálogo antes de volver a intentarlo.');
+  } finally {
+    void reader.cancel().catch(() => {});
+    reader.releaseLock();
+  }
 }

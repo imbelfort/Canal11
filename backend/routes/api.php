@@ -27,12 +27,14 @@ Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'c
 Route::get('/parrilla/qc', [PlayoutBmsController::class, 'getQualityFiles'])->middleware('auth:sanctum');
 Route::post('/parrilla/qc/{archivo}', [PlayoutBmsController::class, 'analyzeQualityFile'])->middleware('auth:sanctum');
 Route::get('/parrilla/archivos', [PlayoutBmsController::class, 'getParrillaFiles'])->middleware('auth:sanctum');
+Route::put('/parrilla/archivos/{archivo}/programa', [PlayoutBmsController::class, 'updateMediaProgram'])->middleware('auth:sanctum');
 Route::post('/parrilla/archivos', [PlayoutBmsController::class, 'storeParrillaFile'])->middleware('auth:sanctum');
 Route::post('/parrilla/bloques', [PlayoutBmsController::class, 'addParrillaBlock'])->middleware('auth:sanctum');
 Route::post('/parrilla/media', [PlayoutBmsController::class, 'uploadPlayoutMedia'])->middleware('auth:sanctum');
 Route::get('/parrilla/media/{file}', [PlayoutBmsController::class, 'getPlayoutMedia'])
     ->where('file', '[A-Za-z0-9]+\.(?:mp4|webm|ogg|ogv)');
 Route::post('/parrilla/emisiones', [PlayoutBmsController::class, 'recordPlayoutCompletion'])->middleware('auth:sanctum');
+Route::get('/parrilla/validacion', [PlayoutBmsController::class, 'validatePlayoutParrilla'])->middleware('auth:sanctum');
 Route::get('/playlist', [PlayoutBmsController::class, 'getPlayoutPlaylist']);
 Route::post('/playlist/replace', [PlayoutBmsController::class, 'replacePlayoutPlaylist'])->middleware('auth:sanctum');
 Route::post('/playlist/items', [PlayoutBmsController::class, 'addPlayoutItem'])->middleware('auth:sanctum');

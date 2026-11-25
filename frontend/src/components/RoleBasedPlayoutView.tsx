@@ -20,7 +20,7 @@ export const RoleBasedPlayoutView: React.FC<RoleBasedPlayoutViewProps> = ({ onOp
   return (
     <div className="bms-role-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="operations-actions bms-subnav">
-        <button onClick={onOpenParrilla}>Abrir Parrilla</button>
+        <button onClick={onOpenParrilla}>{isQC && !isAdmin && !isProg ? 'Ver Parrilla de hoy' : 'Abrir Parrilla'}</button>
         {(isAdmin || (isProg && isQC)) && <>
           {isAdmin && <button className="bms-area-button" aria-pressed={area === 'admin'} onClick={() => setArea('admin')}>Administración</button>}
           <button className="bms-area-button" aria-pressed={area === 'programacion'} onClick={() => setArea('programacion')}>Programación y avisos</button>

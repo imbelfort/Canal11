@@ -1,9 +1,9 @@
-﻿import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 
 interface WorkspaceDialogProps {
   title: string;
   description?: string;
-  wide?: boolean;
+  wide?: boolean | 'full';
   busy?: boolean;
   onClose: () => void;
   children: ReactNode;
@@ -21,7 +21,7 @@ export function WorkspaceDialog({ title, description, wide, busy, onClose, child
   }, []);
 
   return (
-    <dialog ref={dialog} className={`workspace-dialog${wide ? ' workspace-dialog-wide' : ''}`}
+    <dialog ref={dialog} className={`workspace-dialog${wide === 'full' ? ' workspace-dialog-full' : wide ? ' workspace-dialog-wide' : ''}`}
       aria-labelledby={titleId} aria-describedby={description ? descriptionId : undefined}
       onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
       <header className="workspace-dialog-header">

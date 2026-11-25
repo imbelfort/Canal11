@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react';
 import type { AsRunLog, AuditStats as AuditStatsData } from '../../types/playout';
 import { AuditStats } from './AuditStats';
@@ -114,7 +114,7 @@ export function AuditView() {
                   <tr>
                     <td>{datePart(date, log.started_at)}</td>
                     <td><button type="button" className="audit-entry-title" aria-expanded={open} onClick={() => setExpanded(open ? null : log.id)}>{log.title}</button>
-                      <small>{log.pauta_id ? 'Spot pautado' : commercial ? 'Corte' : 'Segmento'}{log.program_title && log.program_title !== log.title ? ` · ${log.program_title}` : ''}</small>
+                      <small>{log.pauta_id ? 'Spot pautado' : log.spot_id ? 'Spot comercial' : commercial ? 'Corte' : 'Segmento'}{log.program_title && log.program_title !== log.title ? ` · ${log.program_title}` : ''}</small>
                     </td>
                     <td>{log.planned_start?.slice(0, 8) || '—'}</td>
                     <td>{datePart(time, log.started_at)}</td>

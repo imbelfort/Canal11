@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+import { ProgramMediaDialog } from './ProgramMediaDialog';
+import { useEffect, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { bmsApi } from '../../services/bmsApi';
 
@@ -19,6 +20,7 @@ interface Program {
 }
 
 export function ProgramCatalog() {
+  const [mediaProgram, setMediaProgram] = useState<Program | null>(null);
   const [programs, setPrograms] = useState<Program[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,18 +163,20 @@ export function ProgramCatalog() {
       {loading ? <p role="status">Cargando programas…</p> : !loadError && (
         visible.length ? <div className="bms-table-container">
           <table className="bms-table">
-            <thead><tr><th>Programa</th><th>Categoría</th><th>Duración habitual</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Programa</th><th>Categoría</th><th>Duración habitual</th><th>Estado</th><th>Materiales</th></tr></thead>
             <tbody>{visible.map(program => (
               <tr key={program.id}>
                 <td><strong>{program.titulo}</strong><small>{program.codigo}{program.descripcion ? ` · ${program.descripcion}` : ''}</small></td>
                 <td>{program.categoria?.nombre ?? categories.find(category => category.id === program.id_categoria)?.nombre ?? '—'}</td>
                 <td>{program.duracion_estandar_minutos} min</td>
                 <td>{program.estado}</td>
+                <td><button type="button" className="bms-btn-secondary" aria-label={`Ver archivos de ${program.titulo}`} onClick={() => setMediaProgram(program)}>Ver archivos</button></td>
               </tr>
             ))}</tbody>
           </table>
         </div> : <p>{programs.length ? 'No hay programas que coincidan con la búsqueda.' : 'Aún no hay programas. Usa Nuevo programa para registrar el primero.'}</p>
       )}
+      {mediaProgram && <ProgramMediaDialog program={mediaProgram} onClose={() => setMediaProgram(null)} />}
     </section>
   );
 }

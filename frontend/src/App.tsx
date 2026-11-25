@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Clock, Layers, ListVideo, LogOut, Sliders, FileSpreadsheet } from 'lucide-react';
 import { AuditView } from './components/Audit/AuditView';
 import { ParrillaView } from './components/Playlist/ParrillaView';
+import { BoliviaClock } from './components/Common/BoliviaClock';
 import { ScreenVisitCount } from './components/Common/ScreenVisitCount';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { LoginModal } from './components/LoginModal';
@@ -25,6 +26,7 @@ export function App() {
           <button aria-pressed={screen === 'audit'} onClick={() => setScreen('audit')}><FileSpreadsheet size={16} /> Bitácora</button>
         </nav>}
         <div className="operations-actions">
+          <BoliviaClock />
           <ScreenVisitCount screen={user ? screen : 'login'} />
           <button onClick={() => setPreferences(true)}><Sliders size={16} /> Apariencia</button>
           {user && <button onClick={() => { setScreen('parrilla'); logout(); }}><LogOut size={16} /> Salir</button>}

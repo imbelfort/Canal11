@@ -1,6 +1,7 @@
 import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import React, { useState, useEffect } from 'react';
-import { uploadCatalogVideo, CatalogFile, qualityLabels, uploadProgressLabel } from '../../services/parrillaMedia';
+import type { CatalogFile } from '../../services/parrillaMedia';
+import { SpotFilePicker } from './SpotFilePicker';
 import { ProgramCatalog } from './ProgramCatalog';
 import { bmsApi } from '../../services/bmsApi';
 import { Layers, Tv, CreditCard, Plus, CheckCircle, QrCode, FileText, UserPlus, Film } from 'lucide-react';
@@ -16,32 +17,23 @@ export const ProgramadorView: React.FC = () => {
   const [spotAsset, setSpotAsset] = useState<CatalogFile | null>(null);
   const [spotTitle, setSpotTitle] = useState('');
   const [spotId, setSpotId] = useState('');
-  const [spotProgress, setSpotProgress] = useState('');
+  const [spotPicker, setSpotPicker] = useState<{ existingId?: number } | null>(null);
   const [spotBusy, setSpotBusy] = useState(false);
   const [spotFeedback, setSpotFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const selectedSpot = spots.find(spot => String(spot.id) === spotId);
   const eligibleSegments = (parrillaHoy?.items ?? []).filter((item: any) =>
     !['EMITIDO', 'CANCELADO'].includes(item.estado) && item.media_playout?.event_type !== 'COMMERCIAL');
 
-  const uploadSpot = async (file: File, existingSpot?: number) => {
-    setSpotBusy(true);
-    setSpotFeedback(null);
-    try {
-      const asset = await uploadCatalogVideo(file, null, progress => setSpotProgress(uploadProgressLabel(progress, file.name)));
-      if (existingSpot) {
-        await bmsApi.linkSpotFile(existingSpot, Number(asset.id.split(':')[1]));
-        await loadData();
-        setSpotFeedback({ error: false, text: asset.qc?.status === 'APROBADO_TECNICO' ? 'Video vinculado al spot. QC aprobado.' : 'Video vinculado. Revísalo en Control de calidad antes de pautarlo.' });
-      } else {
-        setSpotAsset(asset);
-        setSpotTitle(previous => previous || asset.titulo.slice(0, 150));
-      }
-    } catch (err) {
-      setSpotFeedback({ error: true, text: (err as Error).message });
-    } finally {
-      setSpotProgress('');
-      setSpotBusy(false);
+  const selectSpotFile = async (asset: CatalogFile) => {
+    if (spotPicker?.existingId) {
+      await bmsApi.linkSpotFile(spotPicker.existingId, Number(asset.id.split(':')[1]));
+      await loadData();
+      setSpotFeedback({ error: false, text: 'Video aprobado vinculado al spot.' });
+      return;
     }
+
+    setSpotAsset(asset);
+    setSpotTitle(previous => previous || asset.titulo.slice(0, 150));
   };
 
   // Modal QR PagoFacil
@@ -222,20 +214,16 @@ export const ProgramadorView: React.FC = () => {
         {activeSubTab === 'spots' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Alta de Spot Publicitario con Subida de Archivo (CU6)</h3>
+              <h3 className="bms-card-title">Registrar spot publicitario (CU6)</h3>
               <p className="bms-text-muted">
-                Seleccione el archivo de video del comercial. La duración se auto-detecta y se vincula automáticamente en base de datos al cliente seleccionado.
+                Vincula un video aprobado del catálogo y elige el cliente.
               </p>
 
-              {spotProgress && <p role="status">{spotProgress}</p>}
               {spotFeedback && <p role={spotFeedback.error ? 'alert' : 'status'} className={spotFeedback.error ? 'operations-error' : undefined}>{spotFeedback.text}</p>}
-              <label className="bms-form-group">Video del spot (MP4, WebM u Ogg)
-                <input type="file" accept="video/mp4,video/webm,video/ogg,.ogv" disabled={spotBusy} onChange={event => {
-                  const file = event.currentTarget.files?.[0];
-                  if (file) void uploadSpot(file);
-                }} />
-              </label>
-              {spotAsset && <p role="status">{spotAsset.titulo} · {Math.round(spotAsset.duracion_ms / 1000)} s{spotAsset.qc && ` · ${qualityLabels[spotAsset.qc.status]}`}</p>}
+              <div className="operations-actions">
+                <button type="button" onClick={() => setSpotPicker({})} disabled={spotBusy}>Elegir video del catálogo</button>
+                {spotAsset && <span>{spotAsset.titulo} · {(spotAsset.duracion_ms / 1000).toFixed(1)} s</span>}
+              </div>
 
               <form
                 onSubmit={async (e) => {
@@ -327,7 +315,6 @@ export const ProgramadorView: React.FC = () => {
             <div className="bms-card">
               <h3 className="bms-card-title">Pautar spot</h3>
               <p className="bms-text-muted">Elige el segmento y en qu? momento debe reproducirse el spot.</p>
-              {spotProgress && <p role="status">{spotProgress}</p>}
               {spotFeedback && <p role={spotFeedback.error ? 'alert' : 'status'} className={spotFeedback.error ? 'operations-error' : undefined}>{spotFeedback.text}</p>}
               {!eligibleSegments.length && <p>Agrega un segmento en la Parrilla de hoy para poder pautar un spot.</p>}
               <form onSubmit={async event => {
@@ -364,7 +351,7 @@ export const ProgramadorView: React.FC = () => {
                     <select required value={spotId} onChange={event => { setSpotId(event.target.value); setSpotFeedback(null); }} disabled={spotBusy}>
                       <option value="">Selecciona un spot</option>
                       {spots.filter(spot => spot.estado === 'ACTIVO').map(spot => (
-                        <option key={spot.id} value={spot.id}>{spot.titulo_spot}{!spot.archivo ? ' (sin video)' : spot.archivo.qc && spot.archivo.qc.status !== 'APROBADO_TECNICO' ? ' (revisar QC)' : ''}</option>
+                        <option key={spot.id} value={spot.id}>{spot.titulo_spot}{!spot.archivo ? ' (sin video)' : spot.archivo.qc?.status !== 'APROBADO_TECNICO' ? ' (revisar QC)' : ''}</option>
                       ))}
                     </select>
                   </label>
@@ -375,14 +362,12 @@ export const ProgramadorView: React.FC = () => {
                     </select>
                   </label>
                 </div>
-                {selectedSpot && !selectedSpot.archivo && <label className="bms-form-group">
-                  Vincula un video a este spot para habilitar la pauta
-                  <input type="file" accept="video/mp4,video/webm,video/ogg,.ogv" disabled={spotBusy} onChange={event => {
-                    const file = event.currentTarget.files?.[0];
-                    if (file) void uploadSpot(file, selectedSpot.id);
-                  }} />
-                </label>}
-                <button type="submit" className="bms-btn-primary" disabled={spotBusy || !eligibleSegments.length || !selectedSpot?.archivo || Boolean(selectedSpot.archivo?.qc && selectedSpot.archivo.qc.status !== 'APROBADO_TECNICO')}>
+                {selectedSpot && selectedSpot.archivo?.qc?.status !== 'APROBADO_TECNICO' && (
+                  <div className="operations-actions">
+                    <button type="button" disabled={spotBusy} onClick={() => setSpotPicker({ existingId: selectedSpot.id })}>Vincular video aprobado</button>
+                  </div>
+                )}
+                <button type="submit" className="bms-btn-primary" disabled={spotBusy || !eligibleSegments.length || selectedSpot?.archivo?.qc?.status !== 'APROBADO_TECNICO'}>
                   <Layers size={14} /> {spotBusy ? 'Procesando?' : 'Agregar a la Parrilla'}
                 </button>
               </form>
@@ -553,6 +538,7 @@ export const ProgramadorView: React.FC = () => {
           </div>
         </div>
       )}
+      {spotPicker && <SpotFilePicker onSelect={selectSpotFile} onClose={() => setSpotPicker(null)} />}
     </div>
   );
 };

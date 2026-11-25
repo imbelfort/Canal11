@@ -28,8 +28,11 @@ export interface PlaylistItem {
   out_point_ms?: number;
   timing_mode: TimingMode;
   scheduled_time: string | null;
+  scheduled_at?: string | null;
+  not_before?: string | null;
   scheduled_spots?: number;
   pauta_id?: number;
+  spot_id?: number | null;
   cue_label?: string;
   group_id?: string | null;
   program_title?: string | null;
@@ -184,6 +187,7 @@ export interface AsRunLog {
   id: number;
   item_id: number;
   pauta_id: number | null;
+  spot_id?: number | null;
   title: string;
   program_title: string | null;
   file_path: string | null;

@@ -2,8 +2,6 @@ import React, { useRef, useState, useCallback } from 'react';
 import { PlayoutBroadcastState } from '../../types/playout';
 import { api } from '../../services/api';
 import { MasterScreenRouter } from '../Player/MasterScreenRouter';
-import { MasterInputPreview } from '../Player/MasterInputPreview';
-import { MasterAudioModal } from '../Audio/MasterAudioModal';
 import { AlertCircle, X } from 'lucide-react';
 
 import { useEngineState } from './useEngineState';
@@ -19,7 +17,6 @@ export interface MasterDeckProps {
   monitorVolume?: number;
   onToggleMonitorMute?: () => void;
   onMonitorVolumeChange?: (v: number) => void;
-  onOpenAudioModal?: () => void;
 }
 
 export const MasterDeck: React.FC<MasterDeckProps> = ({
@@ -27,11 +24,9 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
   isMuted: propIsMuted,
   monitorVolume: propMonitorVolume,
   onToggleMonitorMute,
-  onMonitorVolumeChange,
-  onOpenAudioModal
+  onMonitorVolumeChange
 }) => {
   const [localIsMuted, setLocalIsMuted] = useState(true);
-  const [localAudioModalOpen, setLocalAudioModalOpen] = useState(false);
   const [localMonitorVolume, setLocalMonitorVolume] = useState<number>(1.0);
 
   // Niveles de audio medidos en el navegador: almacenados en useRef para EVITAR 30-60 re-renders por segundo en todo MasterDeck
@@ -66,41 +61,6 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
       setLocalMonitorVolume(v);
     }
   }, [onMonitorVolumeChange]);
-
-  const handleOpenAudioModal = useCallback(() => {
-    if (onOpenAudioModal) {
-      onOpenAudioModal();
-    } else {
-      setLocalAudioModalOpen(true);
-    }
-  }, [onOpenAudioModal]);
-
-  // Manejo de alternado de CG (Ítem vs Maestro)
-  const itemCgEnabled = Boolean(
-    engineState.currentItem?.cg_enabled ??
-    engineState.currentItem?.show_graphics ??
-    playoutState?.graphics?.masterEnabled ??
-    true
-  );
-  const masterCgEnabled = Boolean(playoutState?.graphics?.masterEnabled ?? true);
-  const cgConfirmed = playoutState?.graphics?.nativeTelemetry?.visible !== undefined;
-
-  const handleToggleItemCg = useCallback(async () => {
-    if (!engineState.currentItem?.id) return;
-    try {
-      await api.toggleItemGraphics(engineState.currentItem.id, !itemCgEnabled);
-    } catch (err: any) {
-      console.error('Error al alternar CG del elemento actual:', err);
-    }
-  }, [engineState.currentItem?.id, itemCgEnabled]);
-
-  const handleToggleMasterCg = useCallback(async () => {
-    try {
-      await api.toggleMasterGraphics(!masterCgEnabled);
-    } catch (err: any) {
-      console.error('Error al alternar CG maestro:', err);
-    }
-  }, [masterCgEnabled]);
 
   const handleAudioLevelsChange = useCallback((left: number, right: number) => {
     liveAudioLevelsRef.current = { left, right };
@@ -145,12 +105,6 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
       <div className="monitor-card" style={{ borderBottom: '1px solid var(--color-hairline)' }}>
         <PgmHeader
           sourceKind={engineState.sourceKind}
-          hasOnAirItem={Boolean(engineState.currentItem)}
-          itemCgEnabled={itemCgEnabled}
-          masterCgEnabled={masterCgEnabled}
-          cgConfirmed={cgConfirmed}
-          onToggleItemCg={handleToggleItemCg}
-          onToggleMasterCg={handleToggleMasterCg}
           isOnAir={engineState.isOnAir}
           isPaused={engineState.isPaused}
           isBlackFallback={engineState.isBlackFallback}
@@ -158,9 +112,6 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
           monitorVolume={monitorVolume}
           onToggleMute={handleToggleMute}
           onMonitorVolumeChange={handleMonitorVolumeChange}
-          onOpenAudioModal={handleOpenAudioModal}
-          masterVolumeDb={playoutState?.masterAudio?.volumeDb}
-          isAudioActive={playoutState?.masterAudio?.active}
         />
 
         {/* Identificador de Emisión Actual */}
@@ -248,29 +199,6 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
         onStop={commands.handleStop}
         onEmergency={commands.handleEmergency}
       />
-
-      {/* 3. SECCIÓN INFERIOR: MONITOR COMPACTO DE ENTRADA / PREVIEW (SDI / NDI) */}
-      <MasterInputPreview
-        isOnAir={engineState.isOnAir}
-        isLive={engineState.isLive}
-        profile={engineState.profile}
-        isCompact={true}
-      />
-
-      {/* Modal Dedicado de Procesamiento Master de Audio */}
-      {!onOpenAudioModal && (
-        <MasterAudioModal
-          isOpen={localAudioModalOpen}
-          onClose={() => setLocalAudioModalOpen(false)}
-          playoutState={playoutState}
-          monitorMuted={isMuted}
-          monitorVolume={monitorVolume}
-          onToggleMonitorMute={handleToggleMute}
-          onMonitorVolumeChange={handleMonitorVolumeChange}
-          leftLevel={liveAudioLevelsRef.current.left}
-          rightLevel={liveAudioLevelsRef.current.right}
-        />
-      )}
     </div>
   );
 };

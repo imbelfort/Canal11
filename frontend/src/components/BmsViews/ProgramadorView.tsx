@@ -6,6 +6,7 @@ export const ProgramadorView: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'parrilla' | 'catalogo' | 'clientes' | 'spots' | 'pautas' | 'pagos'>('parrilla');
   const [parrillaHoy, setParrillaHoy] = useState<any>(null);
   const [programas, setProgramas] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);
   const [pautas, setPautas] = useState<any[]>([]);
@@ -27,7 +28,9 @@ export const ProgramadorView: React.FC = () => {
         setProgramas(pr);
       } else if (activeSubTab === 'catalogo') {
         const pr = await bmsApi.getProgramas();
+        const cat = await bmsApi.getCategorias();
         setProgramas(pr);
+        setCategorias(cat);
       } else if (activeSubTab === 'clientes') {
         const cl = await bmsApi.getClientes();
         setClientes(cl);
@@ -218,6 +221,42 @@ export const ProgramadorView: React.FC = () => {
         {/* CATALOGO (CU2) */}
         {activeSubTab === 'catalogo' && (
           <div className="fade-in">
+            {/* Crear Categoría (CU2) */}
+            <div className="bms-card" style={{ marginBottom: 16 }}>
+              <h3 className="bms-card-title">Crear Nueva Categoría de Programas (CU2)</h3>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const form = e.target as HTMLFormElement;
+                  const body = {
+                    nombre: (form.elements.namedItem('cat_nombre') as HTMLInputElement).value,
+                    descripcion: (form.elements.namedItem('cat_desc') as HTMLInputElement).value
+                  };
+                  const res = await bmsApi.createCategoria(body);
+                  if (res.success || res.categoria) {
+                    alert('Categoría de programas creada exitosamente.');
+                    form.reset();
+                    loadData();
+                  }
+                }}
+              >
+                <div className="bms-form-grid">
+                  <div className="bms-form-group">
+                    <label>Nombre de Categoría</label>
+                    <input name="cat_nombre" required placeholder="Noticias, Deportes, Entretenimiento..." />
+                  </div>
+                  <div className="bms-form-group">
+                    <label>Descripción</label>
+                    <input name="cat_desc" placeholder="Programas informativos y de coyuntura" />
+                  </div>
+                </div>
+                <button type="submit" className="bms-btn-secondary" style={{ marginTop: 8 }}>
+                  <Plus size={14} />
+                  <span>Crear Categoría</span>
+                </button>
+              </form>
+            </div>
+
             <div className="bms-card">
               <h3 className="bms-card-title">Registrar Nuevo Formato en Catalogo (CU2)</h3>
               <form
@@ -225,7 +264,7 @@ export const ProgramadorView: React.FC = () => {
                   e.preventDefault();
                   const form = e.target as HTMLFormElement;
                   const body = {
-                    id_categoria: 1,
+                    id_categoria: Number((form.elements.namedItem('id_cat') as HTMLSelectElement).value) || 1,
                     titulo: (form.elements.namedItem('titulo') as HTMLInputElement).value,
                     duracion_estandar_minutos: Number((form.elements.namedItem('dur') as HTMLInputElement).value),
                     descripcion: (form.elements.namedItem('desc') as HTMLInputElement).value
@@ -244,10 +283,21 @@ export const ProgramadorView: React.FC = () => {
                     <input name="titulo" required placeholder="Telepaís Meridiano" />
                   </div>
                   <div className="bms-form-group">
+                    <label>Categoría</label>
+                    <select name="id_cat" required>
+                      {categorias.map((c) => (
+                        <option key={c.id_categoria} value={c.id_categoria}>
+                          {c.nombre}
+                        </option>
+                      ))}
+                      {categorias.length === 0 && <option value="1">General / Noticias</option>}
+                    </select>
+                  </div>
+                  <div className="bms-form-group">
                     <label>Duracion Estandar (Minutos)</label>
                     <input name="dur" type="number" required defaultValue="60" />
                   </div>
-                  <div className="bms-form-group" style={{ gridColumn: 'span 2' }}>
+                  <div className="bms-form-group">
                     <label>Sinopsis o Descripcion</label>
                     <input name="desc" placeholder="Noticiero central informativo en vivo" />
                   </div>

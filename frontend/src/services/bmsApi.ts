@@ -46,7 +46,16 @@ export const bmsApi = {
   },
   getAuditoria: async () => (await fetch(`${LARAVEL_API}/v1/auditoria`)).json(),
 
-  // CU2: Catálogo de Programas
+  // CU2: Catálogo de Programas y Categorías
+  getCategorias: async () => (await fetch(`${LARAVEL_API}/v1/categorias`)).json(),
+  createCategoria: async (data: any) => {
+    const res = await fetch(`${LARAVEL_API}/v1/categorias`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return res.json();
+  },
   getProgramas: async () => (await fetch(`${LARAVEL_API}/v1/programas`)).json(),
   createPrograma: async (data: any) => {
     const res = await fetch(`${LARAVEL_API}/v1/programas`, {

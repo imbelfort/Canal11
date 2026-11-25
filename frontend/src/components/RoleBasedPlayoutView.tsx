@@ -4,7 +4,11 @@ import { AdminView } from './BmsViews/AdminView';
 import { ProgramadorView } from './BmsViews/ProgramadorView';
 import { ContenidosQCView } from './BmsViews/ContenidosQCView';
 
-export const RoleBasedPlayoutView: React.FC = () => {
+interface RoleBasedPlayoutViewProps {
+  onOpenPreferences?: () => void;
+}
+
+export const RoleBasedPlayoutView: React.FC<RoleBasedPlayoutViewProps> = () => {
   const { user } = usePreferences();
   const userRoles: string[] = user?.roles || [];
   const isAdmin = userRoles.some(r => r.includes('ADMIN'));

@@ -11,12 +11,6 @@ import {
 
 export interface PgmHeaderProps {
   sourceKind: 'LIVE_NDI' | 'LIVE_SDI' | 'FILE' | 'EMERGENCY' | 'BLACK' | 'IDLE';
-  hasOnAirItem: boolean;
-  itemCgEnabled: boolean;
-  masterCgEnabled: boolean;
-  cgConfirmed: boolean;
-  onToggleItemCg: () => void;
-  onToggleMasterCg: () => void;
   isOnAir: boolean;
   isPaused: boolean;
   isBlackFallback: boolean;
@@ -24,29 +18,17 @@ export interface PgmHeaderProps {
   monitorVolume: number;
   onToggleMute: () => void;
   onMonitorVolumeChange: (v: number) => void;
-  onOpenAudioModal: () => void;
-  masterVolumeDb?: number;
-  isAudioActive?: boolean;
 }
 
 export const PgmHeader: React.FC<PgmHeaderProps> = React.memo(({
   sourceKind,
-  hasOnAirItem,
-  itemCgEnabled,
-  masterCgEnabled,
-  cgConfirmed,
-  onToggleItemCg,
-  onToggleMasterCg,
   isOnAir,
   isPaused,
   isBlackFallback,
   isMuted,
   monitorVolume,
   onToggleMute,
-  onMonitorVolumeChange,
-  onOpenAudioModal,
-  masterVolumeDb,
-  isAudioActive
+  onMonitorVolumeChange
 }) => {
   // Renderizado del badge de fuente optimizado sin JSX inestable
   const renderSourceBadge = () => {
@@ -101,55 +83,12 @@ export const PgmHeader: React.FC<PgmHeaderProps> = React.memo(({
         <span
           className="m3-monitor-tag pgm"
           style={{ fontWeight: 700, letterSpacing: '0.04em' }}
-          title="Monitor Principal de Emisión al Aire (PGM / Salida Final a DeckLink SDI y Emisión con CG)"
+          title="Monitor Principal de Emisión al Aire (PGM / Salida Final)"
         >
           SALIDA MASTER (PGM)
         </span>
 
         {renderSourceBadge()}
-
-        {/* Separación estricta entre CG de Ítem y CG Maestro */}
-        {hasOnAirItem ? (
-          <button
-            type="button"
-            onClick={onToggleItemCg}
-            style={{
-              fontSize: 9,
-              padding: '1px 6px',
-              borderRadius: 'var(--radius-full)',
-              fontWeight: 600,
-              background: itemCgEnabled ? 'var(--color-success-subtle)' : 'var(--color-field)',
-              color: itemCgEnabled ? 'var(--color-success)' : 'var(--color-text-muted)',
-              border: itemCgEnabled ? '1px solid rgba(52, 199, 89, 0.4)' : '1px solid var(--color-border-subtle)',
-              cursor: 'pointer'
-            }}
-            title={
-              !cgConfirmed
-                ? 'CG del ítem actual (estado en motor aún no confirmado)'
-                : (itemCgEnabled ? 'Gráficos del clip activo: ENCENDIDOS' : 'Gráficos del clip activo: APAGADOS')
-            }
-          >
-            {itemCgEnabled ? (cgConfirmed ? 'CG ÍTEM: ON' : 'CG ÍTEM: ON*') : 'CG ÍTEM: OFF'}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onToggleMasterCg}
-            style={{
-              fontSize: 9,
-              padding: '1px 6px',
-              borderRadius: 'var(--radius-full)',
-              fontWeight: 600,
-              background: masterCgEnabled ? 'var(--color-success-subtle)' : 'var(--color-field)',
-              color: masterCgEnabled ? 'var(--color-success)' : 'var(--color-text-muted)',
-              border: masterCgEnabled ? '1px solid rgba(52, 199, 89, 0.4)' : '1px solid var(--color-border-subtle)',
-              cursor: 'pointer'
-            }}
-            title={masterCgEnabled ? 'Paquete gráfico maestro activo' : 'Paquete gráfico maestro inactivo'}
-          >
-            {masterCgEnabled ? 'CG MAESTRO: ON' : 'CG MAESTRO: OFF'}
-          </button>
-        )}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -207,32 +146,6 @@ export const PgmHeader: React.FC<PgmHeaderProps> = React.memo(({
             title={`Monitor PC: ${isMuted ? 0 : Math.round(monitorVolume * 100)}%`}
           />
         </div>
-
-        {/* PGM Salida dB Badge con estado veraz */}
-        <button
-          type="button"
-          className="ide-icon-btn"
-          onClick={onOpenAudioModal}
-          title={isAudioActive ? 'Procesamiento de audio DeckLink activo' : 'Ajustes de audio master (no aplicado al SDI)'}
-          style={{
-            background: isAudioActive ? 'rgba(52, 199, 89, 0.12)' : 'rgba(59, 130, 246, 0.1)',
-            border: isAudioActive ? '1px solid rgba(52, 199, 89, 0.4)' : '1px solid rgba(59, 130, 246, 0.35)',
-            color: isAudioActive ? 'var(--color-success)' : 'var(--color-primary)',
-            borderRadius: 4,
-            cursor: 'pointer',
-            padding: '2px 6px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 10,
-            fontWeight: 600
-          }}
-        >
-          <Sliders size={11} />
-          <span>
-            PGM {masterVolumeDb !== undefined ? (masterVolumeDb > 0 ? `+${masterVolumeDb}` : `${masterVolumeDb}`) : '0.0'} dB {isAudioActive ? '' : '(no aplicado)'}
-          </span>
-        </button>
       </div>
     </div>
   );

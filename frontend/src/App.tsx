@@ -4,19 +4,11 @@ import { usePlayoutSocket } from './hooks/usePlayoutSocket';
 import { UnifiedTopBar } from './components/UnifiedTopBar';
 import { MasterDeck } from './components/MasterDeck';
 import { PlaylistTable } from './components/Playlist/PlaylistTable';
-import { OutputConfigModal } from './components/Hardware';
-import { GraphicsModal } from './components/Graphics/GraphicsModal';
-import { EmergencyModal } from './components/Emergency/EmergencyModal';
-import { NetworkModal } from './components/Network/NetworkModal';
-import { AboutModal } from './components/About/AboutModal';
-import { MasterAudioModal } from './components/Audio/MasterAudioModal';
-import { SessionSplashLoader } from './components/Common/SessionSplashLoader';
 import { AuditView } from './components/Audit/AuditView';
-import { IncidentsView } from './components/Incidents/IncidentsView';
 import { PlaylistBuilderView } from './components/Playlist/PlaylistBuilderView';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { ErrorAlertBanner } from './components/Common/ErrorAlertBanner';
-import { ListVideo, FileSpreadsheet, AlertCircle, CalendarClock, Cpu, Layers, Gauge, Clock } from 'lucide-react';
+import { ListVideo, FileSpreadsheet, CalendarClock, Cpu, Layers, Gauge, Clock } from 'lucide-react';
 import { SystemMetrics } from './types/playout';
 import { resolveUrl } from './services/api/client';
 
@@ -25,7 +17,7 @@ import { PreferencesModal } from './components/PreferencesModal';
 import { RoleBasedPlayoutView } from './components/RoleBasedPlayoutView';
 import { usePreferences } from './context/PreferencesContext';
 
-type TabType = 'PLAYLIST' | 'BUILDER' | 'AUDIT' | 'INCIDENTS';
+type TabType = 'PLAYLIST' | 'BUILDER' | 'AUDIT';
 
 export const App: React.FC = () => {
   const { user, setUser } = usePreferences();
@@ -35,7 +27,7 @@ export const App: React.FC = () => {
   const [mainTab, setMainTab] = useState<'BMS' | 'PLAYLIST'>('BMS');
   const [subTab, setSubTab] = useState<TabType>('PLAYLIST');
 
-  const { playoutState, isConnected } = usePlayoutSocket();
+  const { playoutState } = usePlayoutSocket();
 
   // Reloj Oficial de Bolivia (BOT, UTC-4) en Vivo con Segundero
   const [boliviaTime, setBoliviaTime] = useState<string>(() => {
@@ -71,9 +63,6 @@ export const App: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const [isGraphicsModalOpen, setIsGraphicsModalOpen] = useState(false);
-  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
-  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [monitorMuted, setMonitorMuted] = useState(true);
   const [monitorVolume, setMonitorVolume] = useState(1.0);
   const [playlistRefreshKey, setPlaylistRefreshKey] = useState(0);
@@ -100,18 +89,6 @@ export const App: React.FC = () => {
 
   const metrics = playoutState?.systemMetrics || fallbackMetrics;
 
-  // Manejo de errores globales y atajos F9
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'F9') {
-        e.preventDefault();
-        setIsGraphicsModalOpen(prev => !prev);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const handlePlaylistUpdated = () => {
     setPlaylistRefreshKey(k => k + 1);
   };
@@ -127,10 +104,7 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      {/* Animacion de sesion */}
-      <SessionSplashLoader isSessionReady={Boolean(isConnected && playoutState)} />
-
-      {/* TOPBAR UNIFICADA (SIN REFERENCIAS A IBCAST, TOTALMENTE WEB Y ADAPTADA A ROLES) */}
+      {/* TOPBAR UNIFICADA (TOTALMENTE WEB Y ADAPTADA A ROLES) */}
       <UnifiedTopBar
         playoutState={playoutState}
         activeMainTab={mainTab}
@@ -138,7 +112,6 @@ export const App: React.FC = () => {
         onOpenPreferences={() => setIsPreferencesOpen(true)}
         onPlaylistUpdated={handlePlaylistUpdated}
         onNavigateTab={(t) => setSubTab(t)}
-        onOpenGraphicsModal={() => setIsGraphicsModalOpen(true)}
       />
 
       {/* Banner de error global explícito si ocurre un fallo */}
@@ -172,7 +145,6 @@ export const App: React.FC = () => {
                 monitorVolume={monitorVolume}
                 onToggleMonitorMute={() => setMonitorMuted(prev => !prev)}
                 onMonitorVolumeChange={(v) => setMonitorVolume(v)}
-                onOpenAudioModal={() => setIsAudioModalOpen(true)}
               />
             </ErrorBoundary>
           </section>
@@ -199,14 +171,7 @@ export const App: React.FC = () => {
                 onClick={() => setSubTab('AUDIT')}
               >
                 <FileSpreadsheet size={16} />
-                <span>Bitácora As-Run</span>
-              </button>
-              <button
-                className={`tab-btn ${subTab === 'INCIDENTS' ? 'active' : ''}`}
-                onClick={() => setSubTab('INCIDENTS')}
-              >
-                <AlertCircle size={16} />
-                <span>Incidentes de Continuidad</span>
+                <span>As-Run Log (Auditoría)</span>
               </button>
             </nav>
 
@@ -236,41 +201,10 @@ export const App: React.FC = () => {
                   <AuditView />
                 </ErrorBoundary>
               )}
-              {subTab === 'INCIDENTS' && (
-                <ErrorBoundary moduleName="Historial de Incidentes (IncidentsView)">
-                  <IncidentsView />
-                </ErrorBoundary>
-              )}
             </div>
           </section>
         </main>
       )}
-
-      {/* Generador de Gráficos al Aire (CG) */}
-      <ErrorBoundary moduleName="Generador de Gráficos al Aire (CG)">
-        <GraphicsModal
-          isOpen={isGraphicsModalOpen}
-          onClose={() => setIsGraphicsModalOpen(false)}
-          onUpdated={handlePlaylistUpdated}
-        />
-      </ErrorBoundary>
-
-      {/* Configuración de Cortinilla de Respaldo */}
-      <ErrorBoundary moduleName="Configuración de Cortinilla de Respaldo">
-        <EmergencyModal
-          isOpen={isEmergencyModalOpen}
-          onClose={() => setIsEmergencyModalOpen(false)}
-          channelState={playoutState?.state}
-        />
-      </ErrorBoundary>
-
-      {/* Procesador y Mezclador de Audio Master */}
-      <ErrorBoundary moduleName="Procesador y Mezclador de Audio Master">
-        <MasterAudioModal
-          isOpen={isAudioModalOpen}
-          onClose={() => setIsAudioModalOpen(false)}
-        />
-      </ErrorBoundary>
 
       {/* Modal de Preferencias Visuales Heredado */}
       <PreferencesModal

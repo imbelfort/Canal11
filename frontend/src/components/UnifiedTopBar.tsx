@@ -28,8 +28,7 @@ interface UnifiedTopBarProps {
   onSelectMainTab: (tab: 'BMS' | 'PLAYLIST') => void;
   onOpenPreferences: () => void;
   onPlaylistUpdated: () => void;
-  onNavigateTab: (tab: 'PLAYLIST' | 'BUILDER' | 'AUDIT' | 'INCIDENTS') => void;
-  onOpenGraphicsModal?: () => void;
+  onNavigateTab: (tab: 'PLAYLIST' | 'BUILDER' | 'AUDIT') => void;
 }
 
 export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
@@ -38,8 +37,7 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
   onSelectMainTab,
   onOpenPreferences,
   onPlaylistUpdated,
-  onNavigateTab,
-  onOpenGraphicsModal
+  onNavigateTab
 }) => {
   const { user, logout } = usePreferences();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -228,18 +226,6 @@ export const UnifiedTopBar: React.FC<UnifiedTopBarProps> = ({
           <FileSpreadsheet size={14} />
           <span>Bitácora</span>
         </button>
-
-        {/* Gráficos CG */}
-        {onOpenGraphicsModal && (
-          <button
-            className="tool-btn cg-btn"
-            onClick={onOpenGraphicsModal}
-            title="Generador de Gráficos al Aire (CG)"
-          >
-            <Sparkles size={14} />
-            <span>CG</span>
-          </button>
-        )}
 
         {/* Preferencias Visuales (Temas, Tamaño, Colores) */}
         <button

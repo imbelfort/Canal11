@@ -4,9 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Usuario;
-use App\Models\AuditoriaSistema;
-use Illuminate\Support\Facades\Hash;
-use Carbon\Carbon;
 
 class AuthController extends Controller
 {
@@ -15,7 +12,7 @@ class AuthController extends Controller
         $login = $request->input('login') ?? $request->input('email') ?? $request->input('usuario_sistema');
         $password = $request->input('password');
 
-        if (!$login || !$password) {
+        if (!is_string($login) || $login === '' || !is_string($password) || $password === '') {
             return response()->json([
                 'success' => false,
                 'message' => 'Credenciales incompletas. Ingrese usuario/correo y contraseña.'
@@ -34,6 +31,8 @@ class AuthController extends Controller
                 'message' => 'Usuario no encontrado en el sistema.'
             ], 404);
         }
+
+        $request->attributes->set('access_log_user_id', $usuario->id_usuario);
 
         if ($usuario->estado !== 'ACTIVO') {
             return response()->json([
@@ -59,15 +58,6 @@ class AuthController extends Controller
 
         $roles = $usuario->roles->pluck('nombre')->toArray();
         $token = $usuario->createToken('playout_token')->plainTextToken;
-
-        // Registrar auditoría de inicio de sesión
-        AuditoriaSistema::create([
-            'id_usuario' => $usuario->id_usuario,
-            'tabla_afectada' => 'usuario',
-            'accion' => 'LOGIN',
-            'detalle' => "Inicio de sesión exitoso desde Frontend ({$login}) con roles: " . implode(', ', $roles),
-            'fecha_evento' => Carbon::now()
-        ]);
 
         return response()->json([
             'success' => true,

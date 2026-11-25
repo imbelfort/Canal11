@@ -4,10 +4,12 @@ import type { CatalogFile } from '../../services/parrillaMedia';
 import { SpotFilePicker } from './SpotFilePicker';
 import { ProgramCatalog } from './ProgramCatalog';
 import { bmsApi } from '../../services/bmsApi';
+import type { ProgrammingSection } from '../../navigation';
 import { Layers, Tv, CreditCard, Plus, CheckCircle, QrCode, FileText, UserPlus, Film } from 'lucide-react';
 
-export const ProgramadorView: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'catalogo' | 'clientes' | 'spots' | 'pautas' | 'pagos'>('catalogo');
+export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionChange: (section: ProgrammingSection) => void }> = ({
+  section: activeSubTab, onSectionChange: setActiveSubTab,
+}) => {
   const [parrillaHoy, setParrillaHoy] = useState<any>(null);
   const [clientes, setClientes] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);

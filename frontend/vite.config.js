@@ -9,7 +9,13 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://127.0.0.1:8000',
-        changeOrigin: true
+        changeOrigin: true,
+        configure: proxy => {
+          proxy.on('proxyReq', (proxyRequest, request) => {
+            const ip = request.socket.remoteAddress;
+            if (ip) proxyRequest.setHeader('X-Forwarded-For', ip);
+          });
+        }
       }
     }
   }

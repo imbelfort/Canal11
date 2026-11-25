@@ -1,39 +1,36 @@
-import React, { useState } from 'react';
-import { usePreferences } from '../context/PreferencesContext';
 import { AdminView } from './BmsViews/AdminView';
 import { ProgramadorView } from './BmsViews/ProgramadorView';
 import { ContenidosQCView } from './BmsViews/ContenidosQCView';
+import { bmsHome, type BmsArea, type BmsDestination } from '../navigation';
 
-interface RoleBasedPlayoutViewProps {
+const areaLabels: Record<BmsArea, string> = {
+  admin: 'Administración', programacion: 'Programación y avisos', qc: 'Archivos y QC',
+};
+
+export function RoleBasedPlayoutView({ areas, destination, onNavigate, onOpenParrilla }: {
+  areas: BmsArea[];
+  destination: BmsDestination;
+  onNavigate: (destination: BmsDestination) => void;
   onOpenParrilla: () => void;
-}
-
-export const RoleBasedPlayoutView: React.FC<RoleBasedPlayoutViewProps> = ({ onOpenParrilla }) => {
-  const { user } = usePreferences();
-  const userRoles: string[] = user?.roles || [];
-  const isAdmin = userRoles.some(r => r.includes('ADMIN'));
-  const isProg = userRoles.some(r => r.includes('PROG'));
-  const isQC = userRoles.some(r => r.includes('CONT') || r.includes('QC'));
-
-  const [area, setArea] = useState<'admin' | 'programacion' | 'qc'>('admin');
+}) {
+  if (!areas.includes(destination.area)) return null;
 
   return (
     <div className="bms-role-workspace" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="operations-actions bms-subnav">
-        <button onClick={onOpenParrilla}>{isQC && !isAdmin && !isProg ? 'Ver Parrilla de hoy' : 'Abrir Parrilla'}</button>
-        {(isAdmin || (isProg && isQC)) && <>
-          {isAdmin && <button className="bms-area-button" aria-pressed={area === 'admin'} onClick={() => setArea('admin')}>Administración</button>}
-          <button className="bms-area-button" aria-pressed={area === 'programacion'} onClick={() => setArea('programacion')}>Programación y avisos</button>
-          <button className="bms-area-button" aria-pressed={area === 'qc'} onClick={() => setArea('qc')}>Archivos y QC</button>
-        </>}
+        <button onClick={onOpenParrilla}>{areas.length === 1 && areas[0] === 'qc' ? 'Ver Parrilla de hoy' : 'Abrir Parrilla'}</button>
+        {areas.length > 1 && areas.map(area => (
+          <button key={area} className="bms-area-button" aria-pressed={destination.area === area}
+            onClick={() => onNavigate(bmsHome[area])}>{areaLabels[area]}</button>
+        ))}
       </div>
-      {/* VISTA DIRECTA SEGUN ROL - SIN PESTAÑAS DUPLICADAS NI CONFUSAS */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        {isAdmin && area === 'admin' && <AdminView />}
-        {((isAdmin && area === 'programacion') || (!isAdmin && isProg && (!isQC || area !== 'qc'))) && <ProgramadorView />}
-        {((isAdmin && area === 'qc') || (!isAdmin && isQC && (!isProg || area === 'qc'))) && <ContenidosQCView />}
-        {!isAdmin && !isProg && !isQC && <ProgramadorView />}
+        {destination.area === 'admin' && <AdminView section={destination.section}
+          onSectionChange={section => onNavigate({ area: 'admin', section })} />}
+        {destination.area === 'programacion' && <ProgramadorView section={destination.section}
+          onSectionChange={section => onNavigate({ area: 'programacion', section })} />}
+        {destination.area === 'qc' && <ContenidosQCView />}
       </div>
     </div>
   );
-};
+}

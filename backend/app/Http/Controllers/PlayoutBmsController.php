@@ -33,90 +33,104 @@ class PlayoutBmsController extends Controller
     // ==========================================
     public function search(Request $request)
     {
-        $q = trim($request->input('q', ''));
+        abort_unless($request->user()->estado === 'ACTIVO', 403);
+        $filters = $request->validate(['q' => 'nullable|string|max:150']);
+        $q = trim($filters['q'] ?? '');
         if (!$q) {
             return response()->json(['results' => []]);
         }
 
+        $roles = $request->user()->roles()->pluck('nombre');
+        $admin = $roles->contains('ADMINISTRADOR');
+        $programming = $admin || $roles->contains('PROGRAMADOR');
+        $quality = $admin || $roles->contains('ENCARGADO_CONTENIDOS');
         $results = [];
 
-        // 1. Programas
-        $programas = Programa::with('categoria')
-            ->where('titulo', 'ILIKE', "%{$q}%")
-            ->orWhere('codigo', 'ILIKE', "%{$q}%")
-            ->limit(5)->get();
-        foreach ($programas as $p) {
-            $results[] = [
-                'type' => 'PROGRAMA',
-                'title' => "{$p->codigo} - {$p->titulo}",
-                'subtitle' => "Categoría: " . ($p->categoria->nombre ?? 'N/A') . " | {$p->duracion_estandar_minutos} min",
-                'category' => 'Catálogo',
-                'data' => $p
-            ];
+        if ($programming) {
+            // 1. Programas
+            $programas = Programa::with('categoria')
+                ->where('titulo', 'ILIKE', "%{$q}%")
+                ->orWhere('codigo', 'ILIKE', "%{$q}%")
+                ->limit(5)->get();
+            foreach ($programas as $p) {
+                $results[] = [
+                    'type' => 'PROGRAMA',
+                    'title' => "{$p->codigo} - {$p->titulo}",
+                    'subtitle' => "Categoría: " . ($p->categoria->nombre ?? 'N/A') . " | {$p->duracion_estandar_minutos} min",
+                    'category' => 'Catálogo',
+                    'data' => $p
+                ];
+            }
         }
 
-        // 2. Materiales de Video (MAM)
-        $materiales = MaterialVideo::where('titulo_clip', 'ILIKE', "%{$q}%")
-            ->orWhere('codigo_material', 'ILIKE', "%{$q}%")
-            ->limit(5)->get();
-        foreach ($materiales as $m) {
-            $results[] = [
-                'type' => 'MATERIAL_MAM',
-                'title' => "{$m->codigo_material} - {$m->titulo_clip}",
-                'subtitle' => "Formato: {$m->formato} | {$m->duracion_segundos}s | Estado: {$m->estado}",
-                'category' => 'Ingesta MAM',
-                'data' => $m
-            ];
+        if ($quality) {
+            // 2. Materiales de Video (MAM)
+            $materiales = MaterialVideo::where('titulo_clip', 'ILIKE', "%{$q}%")
+                ->orWhere('codigo_material', 'ILIKE', "%{$q}%")
+                ->limit(5)->get();
+            foreach ($materiales as $m) {
+                $results[] = [
+                    'type' => 'MATERIAL_MAM',
+                    'title' => "{$m->codigo_material} - {$m->titulo_clip}",
+                    'subtitle' => "Formato: {$m->formato} | {$m->duracion_segundos}s | Estado: {$m->estado}",
+                    'category' => 'Ingesta MAM',
+                    'data' => $m
+                ];
+            }
         }
 
-        // 3. Clientes Publicitarios
-        $clientes = ClientePublicitario::where('razon_social', 'ILIKE', "%{$q}%")
-            ->orWhere('nit', 'ILIKE', "%{$q}%")
-            ->orWhere('contacto', 'ILIKE', "%{$q}%")
-            ->limit(5)->get();
-        foreach ($clientes as $c) {
-            $results[] = [
-                'type' => 'CLIENTE',
-                'title' => $c->razon_social,
-                'subtitle' => "NIT: {$c->nit} | Contacto: {$c->contacto} | Tel: {$c->telefono}",
-                'category' => 'Comercial',
-                'data' => $c
-            ];
+        if ($programming) {
+            // 3. Clientes Publicitarios
+            $clientes = ClientePublicitario::where('razon_social', 'ILIKE', "%{$q}%")
+                ->orWhere('nit', 'ILIKE', "%{$q}%")
+                ->orWhere('contacto', 'ILIKE', "%{$q}%")
+                ->limit(5)->get();
+            foreach ($clientes as $c) {
+                $results[] = [
+                    'type' => 'CLIENTE',
+                    'title' => $c->razon_social,
+                    'subtitle' => "NIT: {$c->nit} | Contacto: {$c->contacto} | Tel: {$c->telefono}",
+                    'category' => 'Comercial',
+                    'data' => $c
+                ];
+            }
+
+            // 4. Spots Publicitarios
+            $spots = SpotPublicitario::with(['cliente', 'archivo'])
+                ->where('titulo_spot', 'ILIKE', "%{$q}%")
+                ->orWhere('codigo_spot', 'ILIKE', "%{$q}%")
+                ->limit(5)->get();
+            foreach ($spots as $s) {
+                $results[] = [
+                    'type' => 'SPOT',
+                    'title' => "{$s->codigo_spot} - {$s->titulo_spot}",
+                    'subtitle' => "Cliente: " . ($s->cliente->razon_social ?? 'N/A') . " | {$s->duracion_segundos}s",
+                    'category' => 'Comercial',
+                    'data' => $s
+                ];
+            }
         }
 
-        // 4. Spots Publicitarios
-        $spots = SpotPublicitario::with(['cliente', 'archivo'])
-            ->where('titulo_spot', 'ILIKE', "%{$q}%")
-            ->orWhere('codigo_spot', 'ILIKE', "%{$q}%")
-            ->limit(5)->get();
-        foreach ($spots as $s) {
-            $results[] = [
-                'type' => 'SPOT',
-                'title' => "{$s->codigo_spot} - {$s->titulo_spot}",
-                'subtitle' => "Cliente: " . ($s->cliente->razon_social ?? 'N/A') . " | {$s->duracion_segundos}s",
-                'category' => 'Comercial',
-                'data' => $s
-            ];
-        }
-
-        // 5. Usuarios
-        $usuarios = Usuario::where('nombre', 'ILIKE', "%{$q}%")
-            ->orWhere('apellidos', 'ILIKE', "%{$q}%")
-            ->orWhere('email', 'ILIKE', "%{$q}%")
-            ->limit(5)->get();
-        foreach ($usuarios as $u) {
-            $results[] = [
-                'type' => 'USUARIO',
-                'title' => "{$u->nombre} {$u->apellidos}",
-                'subtitle' => "Email: {$u->email} | Usuario: {$u->usuario_sistema} | CI: {$u->ci}",
-                'category' => 'Administración',
-                'data' => $u
-            ];
+        if ($admin) {
+            // 5. Usuarios
+            $usuarios = Usuario::where('nombre', 'ILIKE', "%{$q}%")
+                ->orWhere('apellidos', 'ILIKE', "%{$q}%")
+                ->orWhere('email', 'ILIKE', "%{$q}%")
+                ->limit(5)->get();
+            foreach ($usuarios as $u) {
+                $results[] = [
+                    'type' => 'USUARIO',
+                    'title' => "{$u->nombre} {$u->apellidos}",
+                    'subtitle' => "Email: {$u->email} | Usuario: {$u->usuario_sistema} | CI: {$u->ci}",
+                    'category' => 'Administración',
+                    'data' => $u
+                ];
+            }
         }
 
         // 6. Parrillas
         $parrillas = Parrilla::where('descripcion', 'ILIKE', "%{$q}%")
-            ->orWhere('fecha', 'ILIKE', "%{$q}%")
+            ->orWhereRaw('CAST(fecha AS TEXT) ILIKE ?', ["%{$q}%"])
             ->limit(5)->get();
         foreach ($parrillas as $pr) {
             $results[] = [
@@ -233,7 +247,8 @@ class PlayoutBmsController extends Controller
 
     public function getAuditoria()
     {
-        return response()->json(AuditoriaSistema::with('usuario')->orderBy('fecha_evento', 'desc')->limit(100)->get());
+        return response()->json(AuditoriaSistema::with('usuario')
+            ->whereNull('metodo_http')->orderByDesc('fecha_evento')->limit(100)->get());
     }
 
     // ==========================================
@@ -1409,7 +1424,7 @@ class PlayoutBmsController extends Controller
     public function getAuditLogs(Request $request)
     {
         $page = $request->validate([
-            'limit' => 'nullable|integer|min:1|max:250',
+            'limit' => 'nullable|integer|min:1|max:500',
             'offset' => 'nullable|integer|min:0',
         ]);
         $query = $this->auditQuery($request);
@@ -1439,7 +1454,7 @@ class PlayoutBmsController extends Controller
         }, 'as-run.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
-    public function getAuditStats()
+    public function getAuditStats(Request $request)
     {
         $today = Carbon::today('America/La_Paz');
         $stats = EmisionRealLog::query()->selectRaw(
@@ -1450,14 +1465,43 @@ class PlayoutBmsController extends Controller
             [$today->toDateTimeString(), $today->copy()->addDay()->toDateTimeString()]
         )->first();
 
-        return response()->json(['stats' => [
+        $result = ['stats' => [
             'total_broadcasts' => (int) $stats->total,
             'today_broadcasts' => (int) $stats->today,
             'successful_broadcasts' => (int) $stats->correct,
             'failed_broadcasts' => (int) $stats->failures,
             'total_duration_hours' => round($stats->seconds / 3600, 2),
             'uptime_percentage' => $stats->total ? round($stats->correct / $stats->total * 100, 1) : null,
-        ]]);
+        ]];
+
+        if ($request->boolean('chart')) {
+            $query = $this->auditQuery($request)->reorder();
+            $end = Carbon::parse($request->input('endDate') ?? $today, 'America/La_Paz')->startOfDay();
+            $start = $end->copy()->subDays(13);
+            if ($request->filled('startDate')) {
+                $start = $start->max(Carbon::parse($request->input('startDate'), 'America/La_Paz'));
+            }
+
+            $statuses = (clone $query)->selectRaw('estado_emision AS status, COUNT(*) AS count')
+                ->groupBy('estado_emision')->orderBy('estado_emision')->pluck('count', 'status');
+            $counts = $query->where('hora_inicio_real', '>=', $start->toDateTimeString())
+                ->where('hora_inicio_real', '<', $end->copy()->addDay()->toDateTimeString())
+                ->selectRaw('DATE(hora_inicio_real) AS day, COUNT(*) AS count')
+                ->groupByRaw('DATE(hora_inicio_real)')->pluck('count', 'day');
+
+            $daily = [];
+            for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
+                $date = $day->toDateString();
+                $daily[] = ['day' => $date, 'count' => (int) ($counts[$date] ?? 0)];
+            }
+
+            $result['stats']['chart'] = [
+                'statuses' => $statuses->map(fn ($count) => (int) $count)->all(),
+                'daily' => $daily,
+            ];
+        }
+
+        return response()->json($result);
     }
 
     public function getIncidents()

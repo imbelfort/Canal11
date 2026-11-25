@@ -1,8 +1,10 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AccessLogController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PlayoutBmsController;
+use App\Http\Middleware\RequireAdministrator;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,7 +16,7 @@ use App\Http\Controllers\PlayoutBmsController;
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Buscador Global tipo Gmail (Público/Autenticado)
-Route::get('/search', [PlayoutBmsController::class, 'search']);
+Route::get('/search', [PlayoutBmsController::class, 'search'])->middleware('auth:sanctum');
 
 // Rutas de PagoFácil Callback / Consulta
 Route::get('/pagos', [PlayoutBmsController::class, 'getPagos']);
@@ -57,12 +59,15 @@ Route::middleware('auth:sanctum')->group(function () {
 // Rutas accesibles para sincronización con frontend
 Route::prefix('v1')->group(function () {
     // CU1: Usuarios y Roles
-    Route::get('/usuarios', [PlayoutBmsController::class, 'getUsuarios']);
-    Route::post('/usuarios', [PlayoutBmsController::class, 'createUsuario']);
-    Route::put('/usuarios/{id}', [PlayoutBmsController::class, 'updateUsuario']);
-    Route::delete('/usuarios/{id}', [PlayoutBmsController::class, 'deleteUsuario']);
+    Route::middleware(['auth:sanctum', RequireAdministrator::class])->group(function () {
+        Route::get('/usuarios', [PlayoutBmsController::class, 'getUsuarios']);
+        Route::post('/usuarios', [PlayoutBmsController::class, 'createUsuario']);
+        Route::put('/usuarios/{id}', [PlayoutBmsController::class, 'updateUsuario']);
+        Route::delete('/usuarios/{id}', [PlayoutBmsController::class, 'deleteUsuario']);
+        Route::get('/auditoria', [PlayoutBmsController::class, 'getAuditoria']);
+        Route::get('/accesos', [AccessLogController::class, 'index']);
+    });
     Route::get('/roles', [PlayoutBmsController::class, 'getRoles']);
-    Route::get('/auditoria', [PlayoutBmsController::class, 'getAuditoria']);
 
     // CU2: Catálogo de Programas y Categorías
     Route::get('/categorias', [PlayoutBmsController::class, 'getCategorias']);
@@ -105,5 +110,5 @@ Route::prefix('v1')->group(function () {
     Route::get('/reportes/general', [PlayoutBmsController::class, 'getReporteGeneral']);
 
     // Buscador
-    Route::get('/search', [PlayoutBmsController::class, 'search']);
+    Route::get('/search', [PlayoutBmsController::class, 'search'])->middleware('auth:sanctum');
 });

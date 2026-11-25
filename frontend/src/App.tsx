@@ -4,17 +4,42 @@ import { AuditView } from './components/Audit/AuditView';
 import { ParrillaView } from './components/Playlist/ParrillaView';
 import { BoliviaClock } from './components/Common/BoliviaClock';
 import { ScreenVisitCount } from './components/Common/ScreenVisitCount';
+import { GlobalSearch } from './components/Common/GlobalSearch';
 import { ErrorBoundary } from './components/Common/ErrorBoundary';
 import { LoginModal } from './components/LoginModal';
 import { PreferencesModal } from './components/PreferencesModal';
 import { RoleBasedPlayoutView } from './components/RoleBasedPlayoutView';
 import { usePreferences } from './context/PreferencesContext';
+import { availableBmsAreas, bmsHome, type BmsDestination, type SearchTarget } from './navigation';
 import './styles/parrilla.css';
 
 export function App() {
-  const { user, setUser, logout } = usePreferences();
+  const { user, setUser, logout, updatePreferences } = usePreferences();
   const [screen, setScreen] = useState<'parrilla' | 'bms' | 'audit'>('parrilla');
   const [preferences, setPreferences] = useState(false);
+  const [destination, setDestination] = useState<BmsDestination | null>(null);
+  const areas = availableBmsAreas(user?.roles ?? []);
+  const defaultArea = areas[0];
+  const currentDestination = destination && areas.includes(destination.area) ? destination : defaultArea && bmsHome[defaultArea];
+
+  const go = (target: SearchTarget) => {
+    switch (target.screen) {
+      case 'theme':
+        updatePreferences({ themeMode: target.mode });
+        break;
+      case 'preferences':
+        setPreferences(true);
+        break;
+      case 'bms':
+        if (areas.includes(target.destination.area)) {
+          setDestination(target.destination);
+          setScreen('bms');
+        }
+        break;
+      default:
+        setScreen(target.screen);
+    }
+  };
 
   return (
     <div className="operations-shell">
@@ -22,14 +47,14 @@ export function App() {
         <div className="operations-brand"><strong>Canal 11</strong>{user && <small>{user.nombre} · {user.rol_principal}</small>}</div>
         {user && <nav aria-label="Pantallas principales">
           <button aria-pressed={screen === 'parrilla'} onClick={() => setScreen('parrilla')}><ListVideo size={16} /> Parrilla</button>
-          <button aria-pressed={screen === 'bms'} onClick={() => setScreen('bms')}><Layers size={16} /> Gestión BMS</button>
-          <button aria-pressed={screen === 'audit'} onClick={() => setScreen('audit')}><FileSpreadsheet size={16} /> Bitácora</button>
+          {currentDestination && <button aria-pressed={screen === 'bms'} onClick={() => setScreen('bms')}><Layers size={16} /> Gestión BMS</button>}
+          <button aria-pressed={screen === 'audit'} onClick={() => setScreen('audit')}><FileSpreadsheet size={16} /> As a Run</button>
         </nav>}
+        {user && <GlobalSearch areas={areas} onSelect={go} />}
         <div className="operations-actions">
           <BoliviaClock />
-          <ScreenVisitCount screen={user ? screen : 'login'} />
           <button onClick={() => setPreferences(true)}><Sliders size={16} /> Apariencia</button>
-          {user && <button onClick={() => { setScreen('parrilla'); logout(); }}><LogOut size={16} /> Salir</button>}
+          {user && <button onClick={() => { setScreen('parrilla'); setDestination(null); logout(); }}><LogOut size={16} /> Salir</button>}
         </div>
       </header>
       <main className="operations-main">
@@ -39,10 +64,11 @@ export function App() {
             <ParrillaView visible={screen === 'parrilla'} />
           </ErrorBoundary>
         </section>}
-        {user && screen === 'bms' && (
+        {user && screen === 'bms' && currentDestination && (
           <section className="operations-screen">
             <ErrorBoundary moduleName="Gestión BMS">
-              <RoleBasedPlayoutView onOpenParrilla={() => setScreen('parrilla')} />
+              <RoleBasedPlayoutView areas={areas} destination={currentDestination} onNavigate={setDestination}
+                onOpenParrilla={() => setScreen('parrilla')} />
             </ErrorBoundary>
           </section>
         )}
@@ -52,7 +78,10 @@ export function App() {
           </section>
         )}
       </main>
-      <footer className="operations-footer"><Clock size={13} /> Horarios de Bolivia (UTC-4)</footer>
+      <footer className="operations-footer">
+        <span><Clock size={13} /> Horarios de Bolivia (UTC-4)</span>
+        <ScreenVisitCount screen={user ? screen : 'login'} />
+      </footer>
       <PreferencesModal isOpen={preferences} onClose={() => setPreferences(false)} />
     </div>
   );

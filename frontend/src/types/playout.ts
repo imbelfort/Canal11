@@ -204,6 +204,10 @@ export interface AsRunLog {
 }
 
 export interface AuditStats {
+  chart?: {
+    statuses: Record<string, number>;
+    daily: { day: string; count: number }[];
+  };
   total_broadcasts: number;
   today_broadcasts: number;
   successful_broadcasts: number;

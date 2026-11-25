@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react';
 import type { AsRunLog, AuditStats as AuditStatsData } from '../../types/playout';
 import { AuditStats } from './AuditStats';
+import { AuditChart } from './AuditChart';
 import { api } from '../../services/api';
 import { ErrorAlertBanner } from '../Common/ErrorAlertBanner';
 
@@ -34,7 +35,7 @@ export function AuditView() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(100);
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -47,7 +48,7 @@ export function AuditView() {
       try {
         const [result, summary] = await Promise.all([
           api.getAuditLogs({ status, search, startDate, endDate, limit: pageSize, offset: (page - 1) * pageSize }),
-          api.getAuditStats(),
+          api.getAuditStats({ status, search, startDate, endDate }),
         ]);
         if (!active) return;
         const lastPage = Math.max(1, Math.ceil(result.total / pageSize));
@@ -101,6 +102,10 @@ export function AuditView() {
         <label>Hasta<input type="date" value={endDate} min={startDate || undefined} onChange={event => { setEndDate(event.target.value); setPage(1); }} /></label>
         <button type="submit" className="btn-tool"><Search size={15} /> Buscar</button>
       </form>
+      <details className="audit-chart-panel">
+        <summary>Gráfico de emisiones</summary>
+        <AuditChart data={stats?.chart} labels={statusLabels} loading={loading} />
+      </details>
       <div className="table-scroll-container audit-log-table" tabIndex={0} aria-label="Registros de emisión" aria-busy={loading}>
         <table className="playlist-table">
           <thead><tr>{columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
@@ -140,7 +145,7 @@ export function AuditView() {
       <footer className="audit-pagination">
         <span>{total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total}` : '0 resultados'}</span>
         <label>Filas <select className="btn-tool" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>
-          {[25, 50, 100, 250].map(size => <option key={size}>{size}</option>)}
+          {[25, 50, 100, 250, 500].map(size => <option key={size}>{size}</option>)}
         </select></label>
         <div className="operations-actions">
           <button type="button" disabled={page === 1 || loading} aria-label="Página anterior" onClick={() => setPage(page - 1)}><ChevronLeft size={16} /></button>

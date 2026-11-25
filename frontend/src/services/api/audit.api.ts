@@ -39,8 +39,9 @@ export const auditApi = {
     };
   },
 
-  async getAuditStats(): Promise<AuditStats> {
-    const data = await requestJson<{ stats: AuditStats }>(`${BASE_URL}/audit/stats`);
+  async getAuditStats(filters?: Pick<AuditLogQueryParams, 'startDate' | 'endDate' | 'status' | 'search'>): Promise<AuditStats> {
+    const query = filters ? `?${new URLSearchParams({ ...filters, chart: '1' })}` : '';
+    const data = await requestJson<{ stats: AuditStats }>(`${BASE_URL}/audit/stats${query}`);
     return data.stats;
   },
 

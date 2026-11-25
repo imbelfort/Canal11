@@ -6,6 +6,31 @@ import { BASE_URL, requestJson } from './api/client';
  */
 const LARAVEL_API = 'http://127.0.0.1:8000/api';
 
+const adminHeaders = () => ({
+  Accept: 'application/json',
+  'Content-Type': 'application/json',
+  Authorization: 'Bearer ' + (localStorage.getItem('playout_token') || ''),
+});
+
+export type AccessEvent = 'login_success' | 'login_failure' | 'access_denied' | 'request';
+
+export interface AccessLogPage {
+  entries: {
+    id: number;
+    occurred_at: string;
+    user_id: number | null;
+    ip: string | null;
+    method: string;
+    route: string;
+    status: number;
+    duration_ms: number;
+    event: AccessEvent;
+  }[];
+  next_cursor: string | null;
+  previous_cursor: string | null;
+  top_routes: { method: string; route: string; requests: number; total_ms: number; average_ms: number }[];
+}
+
 export const bmsApi = {
   // Autenticación
   login: async (login: string, password: string) => {
@@ -21,36 +46,40 @@ export const bmsApi = {
   },
 
   // Buscador Universal tipo Gmail
-  search: async (q: string) => {
-    const res = await fetch(`${LARAVEL_API}/search?q=${encodeURIComponent(q)}`);
-    return res.json();
-  },
+  search: (q: string) => requestJson<{ results: any[] }>(`${BASE_URL}/search?q=${encodeURIComponent(q)}`, { headers: adminHeaders() }),
 
   // CU1: Usuarios y Roles
-  getUsuarios: async () => (await fetch(`${LARAVEL_API}/v1/usuarios`)).json(),
+  getUsuarios: () => requestJson<any[]>(`${BASE_URL}/v1/usuarios`, { headers: adminHeaders() }),
   createUsuario: async (data: any) => {
-    const res = await fetch(`${LARAVEL_API}/v1/usuarios`, {
+    const res = await fetch(`${BASE_URL}/v1/usuarios`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data)
     });
     return res.json();
   },
   updateUsuario: async (id: number, data: any) => {
-    const res = await fetch(`${LARAVEL_API}/v1/usuarios/${id}`, {
+    const res = await fetch(`${BASE_URL}/v1/usuarios/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data)
     });
     return res.json();
   },
   deleteUsuario: async (id: number) => {
-    const res = await fetch(`${LARAVEL_API}/v1/usuarios/${id}`, {
-      method: 'DELETE'
+    const res = await fetch(`${BASE_URL}/v1/usuarios/${id}`, {
+      method: 'DELETE',
+      headers: adminHeaders(),
     });
     return res.json();
   },
-  getAuditoria: async () => (await fetch(`${LARAVEL_API}/v1/auditoria`)).json(),
+  getAuditoria: () => requestJson<any[]>(`${BASE_URL}/v1/auditoria`, { headers: adminHeaders() }),
+  getAccessLogs: (event: AccessEvent | '', cursor: string | null, signal: AbortSignal) => {
+    const query = new URLSearchParams();
+    if (event) query.set('event', event);
+    if (cursor) query.set('cursor', cursor);
+    return requestJson<AccessLogPage>(`${BASE_URL}/v1/accesos?${query}`, { headers: adminHeaders(), signal });
+  },
 
   // CU2: Catálogo de Programas y Categorías
   getCategorias: async () => requestJson<{ id: number; nombre: string }[]>(`${BASE_URL}/v1/categorias`),

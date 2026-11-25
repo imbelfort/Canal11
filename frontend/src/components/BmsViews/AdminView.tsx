@@ -1,12 +1,17 @@
 import { ScreenVisitCount } from '../Common/ScreenVisitCount';
+import { AccessLogView } from './AccessLogView';
 import React, { useState, useEffect } from 'react';
 import { bmsApi } from '../../services/bmsApi';
 import { usePreferences } from '../../context/PreferencesContext';
+import type { AdminSection } from '../../navigation';
 import { Users, Shield, BarChart3, UserCheck, Edit2, Trash2, X, Check } from 'lucide-react';
 
-export const AdminView: React.FC = () => {
+export function AdminView({ section, onSectionChange }: {
+  section: AdminSection;
+  onSectionChange: (section: AdminSection) => void;
+}) {
   const { user: currentUser } = usePreferences();
-  const [activeSubTab, setActiveSubTab] = useState<'overview' | 'usuarios' | 'auditoria'>('overview');
+  const activeSubTab = section === 'accesos' || section === 'operaciones' ? 'auditoria' : section;
   const [stats, setStats] = useState<any>({});
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [auditoria, setAuditoria] = useState<any[]>([]);
@@ -16,8 +21,8 @@ export const AdminView: React.FC = () => {
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
   useEffect(() => {
-    loadData();
-  }, [activeSubTab]);
+    if (section !== 'accesos') loadData();
+  }, [section]);
 
   const loadData = async () => {
     setLoading(true);
@@ -63,30 +68,31 @@ export const AdminView: React.FC = () => {
       <div className="bms-subnav">
         <button
           className={`bms-tab-btn ${activeSubTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('overview')}
+          onClick={() => onSectionChange('overview')}
         >
           <BarChart3 size={15} />
           <span>Panel Gerencial y Metricas (CU8)</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'usuarios' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('usuarios')}
+          onClick={() => onSectionChange('usuarios')}
         >
           <Users size={15} />
           <span>Gestion de Personal y Roles (CU1)</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'auditoria' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('auditoria')}
+          aria-pressed={activeSubTab === 'auditoria'}
+          onClick={() => onSectionChange('accesos')}
         >
           <Shield size={15} />
-          <span>Bitacora Oficial de Auditoria (CU7)</span>
+          <span>Bitácora</span>
         </button>
       </div>
 
       <div className="bms-content-area">
         <div className="bms-visit-row"><ScreenVisitCount screen={`administracion:${activeSubTab}`} /></div>
-        {activeSubTab !== 'overview' && <p className="screen-count">{activeSubTab === 'usuarios' ? `${usuarios.length} usuarios` : `${auditoria.length} registros`}</p>}
+        {activeSubTab === 'usuarios' && <p className="screen-count">{usuarios.length} usuarios</p>}
         {/* SUBTAB 1: PANEL GERENCIAL */}
         {activeSubTab === 'overview' && (
           <div className="fade-in">
@@ -267,12 +273,14 @@ export const AdminView: React.FC = () => {
           </div>
         )}
 
-        {/* SUBTAB 3: AUDITORIA (CU7) */}
         {activeSubTab === 'auditoria' && (
           <div className="fade-in">
-            <div className="bms-card">
-              <h3 className="bms-card-title">Bitacora Notariada de Auditoria del Sistema (CU7)</h3>
-              <p className="bms-text-muted">Registro inmutable de todas las acciones operativas realizadas en la plataforma.</p>
+            <div className="audit-chart-switch admin-audit-switch" role="group" aria-label="Tipo de registro">
+              <button type="button" aria-pressed={section === 'accesos'} onClick={() => onSectionChange('accesos')}>Accesos</button>
+              <button type="button" aria-pressed={section === 'operaciones'} onClick={() => onSectionChange('operaciones')}>Operaciones</button>
+            </div>
+            {section === 'accesos' ? <AccessLogView /> : <section className="bms-card">
+              <h3 className="bms-card-title">Auditoría de operaciones</h3>
               <div className="bms-table-container">
                 <table className="bms-table">
                   <thead>
@@ -299,7 +307,7 @@ export const AdminView: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </section>}
           </div>
         )}
       </div>

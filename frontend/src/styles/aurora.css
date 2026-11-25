@@ -240,7 +240,7 @@ body { font-size: 1rem; line-height: 1.55; }
 .operations-shell .bms-table td { overflow-wrap: anywhere; }
 .operations-shell .bms-btn-danger { color: var(--color-live); border-color: var(--color-live); background: var(--color-live-subtle); }
 
-.audit-screen { display: flex; flex-direction: column; height: 100%; overflow: hidden; width: 100%; max-width: var(--layout-width); margin-inline: auto; padding: var(--layout-gutter); }
+.audit-screen { display: flex; flex-direction: column; min-height: 100%; width: 100%; max-width: var(--layout-width); margin-inline: auto; padding: var(--layout-gutter); }
 .audit-screen .stats-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; padding: 0 0 .65rem; background: transparent; }
 .audit-screen .stat-metric { min-width: 0; border: 1px solid var(--color-hairline); }
 .audit-screen .stat-metric .num { font-size: 1.35rem; }
@@ -258,8 +258,6 @@ body { font-size: 1rem; line-height: 1.55; }
 @media (max-width: 767px) {
   .parrilla-playout, .parrilla-composer .parrilla-grid, .login-card-with-demo { grid-template-columns: 1fr; }
   .audit-screen .stats-bar { grid-template-columns: 1fr; }
-  .audit-screen { height: auto; min-height: 100%; }
-  .audit-screen .table-scroll-container { max-height: 56dvh; }
   .operations-shell .bms-form-grid, .operations-shell .bms-grid-stats { grid-template-columns: 1fr; }
 }
 @media (max-width: 490px) {
@@ -279,7 +277,10 @@ body { font-size: 1rem; line-height: 1.55; }
 .audit-filters { align-items: end; background: var(--color-canvas-soft); padding: .7rem; border: 1px solid var(--color-hairline); border-radius: var(--profile-radius); }
 .audit-filters label { display: grid; min-width: 0; gap: .2rem; font-size: .875rem; }
 .audit-filters :is(input, select) { min-width: 0; max-width: 100%; min-height: 2.2rem; padding: .3rem .5rem; color: var(--color-ink); background: var(--color-field); border: 1px solid var(--color-hairline); border-radius: 8px; }
-.audit-log-table { flex: 1 1 auto; overflow: auto; border: 1px solid var(--color-hairline); border-radius: var(--profile-radius); }
+.audit-log-table { flex: 1 0 clamp(16rem, 60dvh, 48rem); min-block-size: clamp(16rem, 60dvh, 48rem); contain: size; overflow: auto; border: 1px solid var(--color-hairline); border-radius: var(--profile-radius); }
+.audit-chart-panel { margin-bottom: .65rem; }
+.audit-chart-panel summary { width: fit-content; cursor: pointer; color: var(--color-accent); font-size: .875rem; font-weight: 600; }
+.audit-chart-panel[open] summary { margin-bottom: .5rem; }
 .audit-log-table .playlist-table { min-width: 56rem; }
 .audit-log-table td { white-space: normal; }
 .audit-log-table td:not(:nth-child(2)) { font-variant-numeric: tabular-nums; }

@@ -7,7 +7,6 @@ import { PlaylistTable } from './components/Playlist/PlaylistTable';
 import { OutputConfigModal, InputConfigModal } from './components/Hardware';
 import { NdiModal } from './components/Ndi/NdiModal';
 import { GraphicsModal } from './components/Graphics/GraphicsModal';
-import { EmergencyModal } from './components/Emergency/EmergencyModal';
 import { NetworkModal } from './components/Network/NetworkModal';
 import { AboutModal } from './components/About/AboutModal';
 import { ExitConfirmModal } from './components/Common/ExitConfirmModal';
@@ -83,7 +82,6 @@ export const App: React.FC = () => {
   const [deckLinkInitialTab, setDeckLinkInitialTab] = useState<'OUTPUT' | 'INPUTS'>('OUTPUT');
   const [isNdiModalOpen, setIsNdiModalOpen] = useState(false);
   const [isGraphicsModalOpen, setIsGraphicsModalOpen] = useState(false);
-  const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [monitorMuted, setMonitorMuted] = useState(true);
@@ -280,7 +278,6 @@ export const App: React.FC = () => {
             onOpenNdiModal={() => setIsNdiModalOpen(true)}
             onOpenAudioModal={() => setIsAudioModalOpen(true)}
             onOpenGraphicsModal={() => setIsGraphicsModalOpen(true)}
-            onOpenEmergencyModal={() => setIsEmergencyModalOpen(true)}
             onOpenNetworkModal={() => setIsNetworkModalOpen(true)}
             onOpenAboutModal={() => setIsAboutModalOpen(true)}
             onOpenExitModal={() => setIsExitModalOpen(true)}
@@ -426,13 +423,6 @@ export const App: React.FC = () => {
         />
       </ErrorBoundary>
 
-      {/* Configuración de Cortinilla de Respaldo */}
-      <ErrorBoundary moduleName="Configuración de Cortinilla de Respaldo">
-        <EmergencyModal
-          isOpen={isEmergencyModalOpen}
-          onClose={() => setIsEmergencyModalOpen(false)}
-        />
-      </ErrorBoundary>
 
       {/* Configuración de Armado en Red & Conexión Multi-Estación */}
       <ErrorBoundary moduleName="Armado en Red & Multi-Estación">

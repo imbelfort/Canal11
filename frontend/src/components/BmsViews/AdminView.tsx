@@ -1,3 +1,4 @@
+import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import React, { useState, useEffect } from 'react';
 import { bmsApi } from '../../services/bmsApi';
 import { usePreferences } from '../../context/PreferencesContext';
@@ -84,6 +85,8 @@ export const AdminView: React.FC = () => {
       </div>
 
       <div className="bms-content-area">
+        <div className="bms-visit-row"><ScreenVisitCount screen={`administracion:${activeSubTab}`} /></div>
+        {activeSubTab !== 'overview' && <p className="screen-count">{activeSubTab === 'usuarios' ? `${usuarios.length} usuarios` : `${auditoria.length} registros`}</p>}
         {/* SUBTAB 1: PANEL GERENCIAL */}
         {activeSubTab === 'overview' && (
           <div className="fade-in">
@@ -216,7 +219,7 @@ export const AdminView: React.FC = () => {
                           <td><strong>#{u.id_usuario}</strong></td>
                           <td>
                             <strong>{u.nombre} {u.apellidos}</strong>
-                            {isSelf && <span style={{ marginLeft: 6, fontSize: 10, color: '#38bdf8' }}>(Tu cuenta)</span>}
+                            {isSelf && <span style={{ marginLeft: 6, fontSize: '0.6897rem', color: 'var(--color-accent)' }}>(Tu cuenta)</span>}
                           </td>
                           <td>{u.ci}</td>
                           <td>{u.email}</td>
@@ -306,8 +309,8 @@ export const AdminView: React.FC = () => {
         <div className="config-modal-backdrop" onClick={() => setEditingUser(null)}>
           <div className="config-modal-card" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <h3 style={{ margin: 0, fontSize: 16 }}>Modificar Operador #{editingUser.id_usuario}</h3>
-              <button onClick={() => setEditingUser(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <h3 style={{ margin: 0, fontSize: '1.103rem' }}>Modificar Operador #{editingUser.id_usuario}</h3>
+              <button onClick={() => setEditingUser(null)} style={{ background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>

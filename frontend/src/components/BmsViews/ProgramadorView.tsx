@@ -1,37 +1,60 @@
+import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import React, { useState, useEffect } from 'react';
+import { uploadCatalogVideo, CatalogFile, qualityLabels, uploadProgressLabel } from '../../services/parrillaMedia';
+import { ProgramCatalog } from './ProgramCatalog';
 import { bmsApi } from '../../services/bmsApi';
-import { Calendar, Layers, Tv, CreditCard, Plus, CheckCircle, QrCode, FileText, UserPlus, Film } from 'lucide-react';
+import { Layers, Tv, CreditCard, Plus, CheckCircle, QrCode, FileText, UserPlus, Film } from 'lucide-react';
 
 export const ProgramadorView: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'parrilla' | 'catalogo' | 'clientes' | 'spots' | 'pautas' | 'pagos'>('parrilla');
+  const [activeSubTab, setActiveSubTab] = useState<'catalogo' | 'clientes' | 'spots' | 'pautas' | 'pagos'>('catalogo');
   const [parrillaHoy, setParrillaHoy] = useState<any>(null);
-  const [programas, setProgramas] = useState<any[]>([]);
-  const [categorias, setCategorias] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);
   const [pautas, setPautas] = useState<any[]>([]);
   const [pagos, setPagos] = useState<any[]>([]);
 
+  const [spotAsset, setSpotAsset] = useState<CatalogFile | null>(null);
+  const [spotTitle, setSpotTitle] = useState('');
+  const [spotId, setSpotId] = useState('');
+  const [spotProgress, setSpotProgress] = useState('');
+  const [spotBusy, setSpotBusy] = useState(false);
+  const [spotFeedback, setSpotFeedback] = useState<{ error: boolean; text: string } | null>(null);
+  const selectedSpot = spots.find(spot => String(spot.id) === spotId);
+  const eligibleSegments = (parrillaHoy?.items ?? []).filter((item: any) =>
+    !['EMITIDO', 'CANCELADO'].includes(item.estado) && item.media_playout?.event_type !== 'COMMERCIAL');
+
+  const uploadSpot = async (file: File, existingSpot?: number) => {
+    setSpotBusy(true);
+    setSpotFeedback(null);
+    try {
+      const asset = await uploadCatalogVideo(file, null, progress => setSpotProgress(uploadProgressLabel(progress, file.name)));
+      if (existingSpot) {
+        await bmsApi.linkSpotFile(existingSpot, Number(asset.id.split(':')[1]));
+        await loadData();
+        setSpotFeedback({ error: false, text: asset.qc?.status === 'APROBADO_TECNICO' ? 'Video vinculado al spot. QC aprobado.' : 'Video vinculado. Revísalo en Control de calidad antes de pautarlo.' });
+      } else {
+        setSpotAsset(asset);
+        setSpotTitle(previous => previous || asset.titulo.slice(0, 150));
+      }
+    } catch (err) {
+      setSpotFeedback({ error: true, text: (err as Error).message });
+    } finally {
+      setSpotProgress('');
+      setSpotBusy(false);
+    }
+  };
+
   // Modal QR PagoFacil
   const [qrModal, setQrModal] = useState<{ open: boolean; txId: string; qrImg: string; monto: number; concepto: string } | null>(null);
 
   useEffect(() => {
+    setSpotFeedback(null);
     loadData();
   }, [activeSubTab]);
 
   const loadData = async () => {
     try {
-      if (activeSubTab === 'parrilla') {
-        const ph = await bmsApi.getParrillaHoy();
-        const pr = await bmsApi.getProgramas();
-        setParrillaHoy(ph);
-        setProgramas(pr);
-      } else if (activeSubTab === 'catalogo') {
-        const pr = await bmsApi.getProgramas();
-        const cat = await bmsApi.getCategorias();
-        setProgramas(pr);
-        setCategorias(cat);
-      } else if (activeSubTab === 'clientes') {
+      if (activeSubTab === 'clientes') {
         const cl = await bmsApi.getClientes();
         setClientes(cl);
       } else if (activeSubTab === 'spots') {
@@ -51,7 +74,11 @@ export const ProgramadorView: React.FC = () => {
         setPagos(pg);
       }
     } catch (e) {
-      console.error(e);
+      if (activeSubTab === 'spots' || activeSubTab === 'pautas') {
+        setSpotFeedback({ error: true, text: (e as Error).message });
+      } else {
+        console.error(e);
+      }
     }
   };
 
@@ -60,18 +87,11 @@ export const ProgramadorView: React.FC = () => {
       {/* Subnavegacion estilizada */}
       <div className="bms-subnav">
         <button
-          className={`bms-tab-btn ${activeSubTab === 'parrilla' ? 'active' : ''}`}
-          onClick={() => setActiveSubTab('parrilla')}
-        >
-          <Calendar size={15} />
-          <span>Parrilla y Escaleta Diaria (CU3)</span>
-        </button>
-        <button
           className={`bms-tab-btn ${activeSubTab === 'catalogo' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('catalogo')}
         >
           <Tv size={15} />
-          <span>Catalogo de Programas (CU2)</span>
+          <span>Programas (CU2)</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'clientes' ? 'active' : ''}`}
@@ -104,240 +124,14 @@ export const ProgramadorView: React.FC = () => {
       </div>
 
       <div className="bms-content-area">
-        {/* PARRILLA (CU3) */}
-        {activeSubTab === 'parrilla' && (
-          <div className="fade-in">
-            <div className="bms-card">
-              <h3 className="bms-card-title">Asignar Bloque Horario a la Parrilla (CU3 Escaleta)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    id_parrilla: parrillaHoy?.id_parrilla || 1,
-                    id_programa: Number((form.elements.namedItem('id_prog') as HTMLSelectElement).value),
-                    hora_inicio: (form.elements.namedItem('inicio') as HTMLInputElement).value,
-                    hora_fin: (form.elements.namedItem('fin') as HTMLInputElement).value,
-                    tipo_emision: (form.elements.namedItem('tipo') as HTMLSelectElement).value,
-                    observaciones: (form.elements.namedItem('obs') as HTMLInputElement).value
-                  };
-                  const res = await bmsApi.addItemParrilla(body);
-                  if (res.success || res.item) {
-                    alert('Bloque horario agregado a la parrilla exitosamente.');
-                    form.reset();
-                    loadData();
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Programa a Emitir</label>
-                    <select name="id_prog" required>
-                      {programas.map((p) => (
-                        <option key={p.id_programa} value={p.id_programa}>
-                          {p.codigo} - {p.titulo} ({p.duracion_estandar_minutos} min)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Hora Inicio (HH:MM)</label>
-                    <input name="inicio" type="time" required defaultValue="12:00" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Hora Fin (HH:MM)</label>
-                    <input name="fin" type="time" required defaultValue="13:00" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Tipo de Emision</label>
-                    <select name="tipo">
-                      <option value="GRABADO">GRABADO (Archivo Digital)</option>
-                      <option value="VIVO">VIVO (Estudio Central)</option>
-                      <option value="RETRANSMISION">RETRANSMISION</option>
-                    </select>
-                  </div>
-                  <div className="bms-form-group" style={{ gridColumn: 'span 2' }}>
-                    <label>Observaciones de Continuidad</label>
-                    <input name="obs" placeholder="Emision especial con tanda publicitaria central" />
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-primary">
-                  <Plus size={14} />
-                  <span>Insertar Bloque en Parrilla</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">
-                Escaleta Programada: {parrillaHoy?.fecha || 'Hoy'} ({parrillaHoy?.canal_senial || 'Canal 11'})
-              </h3>
-              <div className="bms-table-container">
-                <table className="bms-table">
-                  <thead>
-                    <tr>
-                      <th>Horario</th>
-                      <th>Programa</th>
-                      <th>Categoria</th>
-                      <th>Modalidad</th>
-                      <th>Estado</th>
-                      <th>Accion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(parrillaHoy?.items || []).map((it: any) => (
-                      <tr key={it.id_item_parrilla}>
-                        <td><strong>{it.hora_inicio} - {it.hora_fin}</strong></td>
-                        <td>{it.programa?.titulo || 'Bloque Especial'}</td>
-                        <td>{it.programa?.categoria?.nombre || 'General'}</td>
-                        <td><span className="bms-pill-badge bms-badge-cyan">{it.tipo_emision}</span></td>
-                        <td>
-                          <span className={`bms-status-indicator ${it.estado === 'EMITIDO' ? 'status-ok' : 'status-ready'}`}>
-                            {it.estado}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            className="bms-btn-danger"
-                            onClick={async () => {
-                              if (confirm('Eliminar bloque de la parrilla?')) {
-                                await bmsApi.deleteItemParrilla(it.id_item_parrilla);
-                                loadData();
-                              }
-                            }}
-                          >
-                            Eliminar
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* CATALOGO (CU2) */}
-        {activeSubTab === 'catalogo' && (
-          <div className="fade-in">
-            {/* Crear Categoría (CU2) */}
-            <div className="bms-card" style={{ marginBottom: 16 }}>
-              <h3 className="bms-card-title">Crear Nueva Categoría de Programas (CU2)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    nombre: (form.elements.namedItem('cat_nombre') as HTMLInputElement).value,
-                    descripcion: (form.elements.namedItem('cat_desc') as HTMLInputElement).value
-                  };
-                  const res = await bmsApi.createCategoria(body);
-                  if (res.success || res.categoria) {
-                    alert('Categoría de programas creada exitosamente.');
-                    form.reset();
-                    loadData();
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Nombre de Categoría</label>
-                    <input name="cat_nombre" required placeholder="Noticias, Deportes, Entretenimiento..." />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Descripción</label>
-                    <input name="cat_desc" placeholder="Programas informativos y de coyuntura" />
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-secondary" style={{ marginTop: 8 }}>
-                  <Plus size={14} />
-                  <span>Crear Categoría</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">Registrar Nuevo Formato en Catalogo (CU2)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    id_categoria: Number((form.elements.namedItem('id_cat') as HTMLSelectElement).value) || 1,
-                    titulo: (form.elements.namedItem('titulo') as HTMLInputElement).value,
-                    duracion_estandar_minutos: Number((form.elements.namedItem('dur') as HTMLInputElement).value),
-                    descripcion: (form.elements.namedItem('desc') as HTMLInputElement).value
-                  };
-                  const res = await bmsApi.createPrograma(body);
-                  if (res.success || res.programa) {
-                    alert('Programa registrado exitosamente en el catalogo.');
-                    form.reset();
-                    loadData();
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Titulo del Programa</label>
-                    <input name="titulo" required placeholder="Telepaís Meridiano" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Categoría</label>
-                    <select name="id_cat" required>
-                      {categorias.map((c) => (
-                        <option key={c.id_categoria} value={c.id_categoria}>
-                          {c.nombre}
-                        </option>
-                      ))}
-                      {categorias.length === 0 && <option value="1">General / Noticias</option>}
-                    </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Duracion Estandar (Minutos)</label>
-                    <input name="dur" type="number" required defaultValue="60" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Sinopsis o Descripcion</label>
-                    <input name="desc" placeholder="Noticiero central informativo en vivo" />
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-primary">
-                  <Plus size={14} />
-                  <span>Guardar en Catalogo</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">Formatos y Programas Activos</h3>
-              <div className="bms-table-container">
-                <table className="bms-table">
-                  <thead>
-                    <tr>
-                      <th>Codigo</th>
-                      <th>Titulo</th>
-                      <th>Categoria</th>
-                      <th>Duracion Estandar</th>
-                      <th>Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {programas.map((p) => (
-                      <tr key={p.id_programa}>
-                        <td><strong>{p.codigo}</strong></td>
-                        <td>{p.titulo}</td>
-                        <td>{p.categoria?.nombre || 'General'}</td>
-                        <td>{p.duracion_estandar_minutos} minutos</td>
-                        <td><span className="bms-status-indicator status-ok">{p.estado}</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="bms-visit-row"><ScreenVisitCount screen={`programacion:${activeSubTab}`} /></div>
+        {activeSubTab !== 'catalogo' && <p className="screen-count">{{
+          clientes: `${clientes.length} clientes`,
+          spots: `${spots.length} spots`,
+          pautas: `${pautas.length} pautas`,
+          pagos: `${pagos.length} pagos`,
+        }[activeSubTab]}</p>}
+        {activeSubTab === 'catalogo' && <ProgramCatalog />}
 
         {/* CLIENTES (CU6) */}
         {activeSubTab === 'clientes' && (
@@ -433,50 +227,15 @@ export const ProgramadorView: React.FC = () => {
                 Seleccione el archivo de video del comercial. La duración se auto-detecta y se vincula automáticamente en base de datos al cliente seleccionado.
               </p>
 
-              {/* Zona de exploracion de archivos para Spot */}
-              <div
-                style={{
-                  border: '2px dashed var(--color-hairline, #334155)',
-                  borderRadius: 12,
-                  padding: 18,
-                  textAlign: 'center',
-                  background: 'var(--color-field, #0f172a)',
-                  marginBottom: 16,
-                  cursor: 'pointer'
-                }}
-                onClick={() => document.getElementById('spot-file-input')?.click()}
-              >
-                <Film size={28} color="var(--primary, #38bdf8)" style={{ margin: '0 auto 6px' }} />
-                <div style={{ fontWeight: 600, fontSize: 13.5 }}>Haga clic aquí para seleccionar el archivo de video del Spot</div>
-                <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Formatos: MP4, MOV, MKV, MXF, TS</div>
-                <input
-                  id="spot-file-input"
-                  type="file"
-                  accept="video/*,.mxf,.ts,.mp4,.mov"
-                  style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const baseName = file.name.replace(/\.[^/.]+$/, '');
-                    const titleInput = document.getElementById('spot-titulo-input') as HTMLInputElement;
-                    const durInput = document.getElementById('spot-duracion-input') as HTMLInputElement;
-                    if (titleInput) titleInput.value = baseName;
-
-                    try {
-                      const url = URL.createObjectURL(file);
-                      const v = document.createElement('video');
-                      v.preload = 'metadata';
-                      v.onloadedmetadata = () => {
-                        URL.revokeObjectURL(url);
-                        if (durInput) durInput.value = String(Math.round(v.duration) || 30);
-                      };
-                      v.src = url;
-                    } catch {
-                      if (durInput) durInput.value = '30';
-                    }
-                  }}
-                />
-              </div>
+              {spotProgress && <p role="status">{spotProgress}</p>}
+              {spotFeedback && <p role={spotFeedback.error ? 'alert' : 'status'} className={spotFeedback.error ? 'operations-error' : undefined}>{spotFeedback.text}</p>}
+              <label className="bms-form-group">Video del spot (MP4, WebM u Ogg)
+                <input type="file" accept="video/mp4,video/webm,video/ogg,.ogv" disabled={spotBusy} onChange={event => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) void uploadSpot(file);
+                }} />
+              </label>
+              {spotAsset && <p role="status">{spotAsset.titulo} · {Math.round(spotAsset.duracion_ms / 1000)} s{spotAsset.qc && ` · ${qualityLabels[spotAsset.qc.status]}`}</p>}
 
               <form
                 onSubmit={async (e) => {
@@ -487,11 +246,23 @@ export const ProgramadorView: React.FC = () => {
                     titulo_spot: (form.elements.namedItem('titulo') as HTMLInputElement).value,
                     duracion_segundos: Number((form.elements.namedItem('duracion') as HTMLInputElement).value)
                   };
-                  const res = await bmsApi.createSpot(body);
-                  if (res.success || res.spot) {
-                    alert('Spot publicitario registrado y vinculado al cliente en BD.');
+                  setSpotBusy(true);
+                  setSpotFeedback(null);
+                  try {
+                    await bmsApi.createSpot({
+                      ...body,
+                      duracion_segundos: spotAsset ? Math.max(1, Math.round(spotAsset.duracion_ms / 1000)) : body.duracion_segundos,
+                      id_archivo_parrilla: spotAsset ? Number(spotAsset.id.split(':')[1]) : null,
+                    });
                     form.reset();
-                    loadData();
+                    setSpotAsset(null);
+                    setSpotTitle('');
+                    await loadData();
+                    setSpotFeedback({ error: false, text: 'Spot guardado.' });
+                  } catch (err) {
+                    setSpotFeedback({ error: true, text: (err as Error).message });
+                  } finally {
+                    setSpotBusy(false);
                   }
                 }}
               >
@@ -506,14 +277,14 @@ export const ProgramadorView: React.FC = () => {
                   </div>
                   <div className="bms-form-group">
                     <label>Titulo del Comercial / Campaña</label>
-                    <input id="spot-titulo-input" name="titulo" required placeholder="Promocion Fin de Año 2026" />
+                    <input id="spot-titulo-input" name="titulo" required maxLength={150} value={spotTitle} onChange={event => setSpotTitle(event.target.value)} placeholder="Promocion Fin de Año 2026" />
                   </div>
                   <div className="bms-form-group">
                     <label>Duracion en Segundos (Auto-detectada)</label>
-                    <input id="spot-duracion-input" name="duracion" type="number" required defaultValue="30" />
+                    <input id="spot-duracion-input" name="duracion" type="number" min={1} required defaultValue={spotAsset ? Math.max(1, Math.round(spotAsset.duracion_ms / 1000)) : 30} key={spotAsset?.id ?? 'manual'} readOnly={Boolean(spotAsset)} />
                   </div>
                 </div>
-                <button type="submit" className="bms-btn-primary">
+                <button type="submit" className="bms-btn-primary" disabled={spotBusy}>
                   <Plus size={14} />
                   <span>Guardar Spot Comercial en BD</span>
                 </button>
@@ -554,62 +325,65 @@ export const ProgramadorView: React.FC = () => {
         {activeSubTab === 'pautas' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Pautar Spot en Bloque Horario (CU6)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    id_item_parrilla: Number((form.elements.namedItem('bloque') as HTMLSelectElement).value),
-                    id_spot: Number((form.elements.namedItem('spot') as HTMLSelectElement).value),
-                    tanda_bloque: (form.elements.namedItem('tanda') as HTMLSelectElement).value,
-                    orden: Number((form.elements.namedItem('orden') as HTMLInputElement).value)
-                  };
-                  const res = await bmsApi.createPauta(body);
-                  if (res.success || res.pauta) {
-                    alert('Spot pautado exitosamente.');
-                    form.reset();
-                    loadData();
-                  }
-                }}
-              >
+              <h3 className="bms-card-title">Pautar spot</h3>
+              <p className="bms-text-muted">Elige el segmento y en qu? momento debe reproducirse el spot.</p>
+              {spotProgress && <p role="status">{spotProgress}</p>}
+              {spotFeedback && <p role={spotFeedback.error ? 'alert' : 'status'} className={spotFeedback.error ? 'operations-error' : undefined}>{spotFeedback.text}</p>}
+              {!eligibleSegments.length && <p>Agrega un segmento en la Parrilla de hoy para poder pautar un spot.</p>}
+              <form onSubmit={async event => {
+                event.preventDefault();
+                const form = new FormData(event.currentTarget);
+                setSpotBusy(true);
+                setSpotFeedback(null);
+                try {
+                  await bmsApi.createPauta({
+                    id_item_parrilla: Number(form.get('bloque')),
+                    id_spot: Number(spotId),
+                    tanda_bloque: String(form.get('tanda')),
+                  });
+                  await loadData();
+                  setSpotFeedback({ error: false, text: 'Spot agregado a la secuencia de la Parrilla.' });
+                } catch (err) {
+                  setSpotFeedback({ error: true, text: (err as Error).message });
+                } finally {
+                  setSpotBusy(false);
+                }
+              }}>
                 <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Bloque / Programa Destino</label>
-                    <select name="bloque" required>
-                      {(parrillaHoy?.items || []).map((it: any) => (
-                        <option key={it.id_item_parrilla} value={it.id_item_parrilla}>
-                          {it.hora_inicio} - {it.programa?.titulo}
+                  <label className="bms-form-group">Segmento del programa
+                    <select name="bloque" required defaultValue="">
+                      <option value="">Selecciona un segmento</option>
+                      {eligibleSegments.map((item: any) => (
+                        <option key={item.id} value={item.id}>
+                          {item.hora_inicio?.slice(0, 5)} ? {item.media_playout?.program_title ? `${item.media_playout.program_title} / ` : ''}{item.media_playout?.title ?? item.programa?.titulo ?? `Bloque ${item.id}`}
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Spot Comercial</label>
-                    <select name="spot" required>
-                      {spots.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.codigo_spot} - {s.titulo_spot} ({s.cliente?.razon_social})
-                        </option>
+                  </label>
+                  <label className="bms-form-group">Spot
+                    <select required value={spotId} onChange={event => { setSpotId(event.target.value); setSpotFeedback(null); }} disabled={spotBusy}>
+                      <option value="">Selecciona un spot</option>
+                      {spots.filter(spot => spot.estado === 'ACTIVO').map(spot => (
+                        <option key={spot.id} value={spot.id}>{spot.titulo_spot}{!spot.archivo ? ' (sin video)' : spot.archivo.qc && spot.archivo.qc.status !== 'APROBADO_TECNICO' ? ' (revisar QC)' : ''}</option>
                       ))}
                     </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Tanda Publicitaria</label>
-                    <select name="tanda">
-                      <option value="TANDA_1">Tanda 1 (Apertura)</option>
-                      <option value="TANDA_2">Tanda 2 (Intermedio)</option>
-                      <option value="TANDA_3">Tanda 3 (Cierre)</option>
+                  </label>
+                  <label className="bms-form-group">Momento de salida
+                    <select name="tanda" defaultValue="CORTE_1">
+                      <option value="INICIO_PROGRAMA">Antes del segmento</option>
+                      <option value="CORTE_1">Despu?s del segmento</option>
                     </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Posicion / Orden</label>
-                    <input name="orden" type="number" required defaultValue="1" />
-                  </div>
+                  </label>
                 </div>
-                <button type="submit" className="bms-btn-primary">
-                  <Layers size={14} />
-                  <span>Insertar Pauta Comercial</span>
+                {selectedSpot && !selectedSpot.archivo && <label className="bms-form-group">
+                  Vincula un video a este spot para habilitar la pauta
+                  <input type="file" accept="video/mp4,video/webm,video/ogg,.ogv" disabled={spotBusy} onChange={event => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file) void uploadSpot(file, selectedSpot.id);
+                  }} />
+                </label>}
+                <button type="submit" className="bms-btn-primary" disabled={spotBusy || !eligibleSegments.length || !selectedSpot?.archivo || Boolean(selectedSpot.archivo?.qc && selectedSpot.archivo.qc.status !== 'APROBADO_TECNICO')}>
+                  <Layers size={14} /> {spotBusy ? 'Procesando?' : 'Agregar a la Parrilla'}
                 </button>
               </form>
             </div>
@@ -631,10 +405,10 @@ export const ProgramadorView: React.FC = () => {
                   <tbody>
                     {pautas.map((pt) => (
                       <tr key={pt.id}>
-                        <td><strong>{pt.item_parrilla?.hora_inicio} - {pt.item_parrilla?.programa?.titulo}</strong></td>
+                        <td><strong>{pt.item_parrilla?.hora_inicio} - {pt.item_parrilla?.media_playout?.title ?? pt.item_parrilla?.programa?.titulo}</strong></td>
                         <td>{pt.spot?.titulo_spot}</td>
                         <td>{pt.spot?.cliente?.razon_social}</td>
-                        <td><span className="bms-pill-badge bms-badge-blue">{pt.tanda_bloque}</span></td>
+                        <td><span className="bms-pill-badge bms-badge-blue">{pt.tanda_bloque === 'INICIO_PROGRAMA' ? 'Antes del segmento' : 'Despu?s del segmento'}</span></td>
                         <td>#{pt.orden}</td>
                         <td><span className="bms-status-indicator status-ok">{pt.estado}</span></td>
                       </tr>
@@ -757,11 +531,11 @@ export const ProgramadorView: React.FC = () => {
         <div className="config-modal-backdrop" onClick={() => setQrModal(null)}>
           <div className="config-modal-card" style={{ maxWidth: 360, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: '0 0 8px' }}>Escanear QR de PagoFacil</h3>
-            <p className="bms-text-muted" style={{ fontSize: 12 }}>{qrModal.concepto}</p>
+            <p className="bms-text-muted" style={{ fontSize: '0.8276rem' }}>{qrModal.concepto}</p>
             <div style={{ background: '#fff', padding: 12, borderRadius: 12, display: 'inline-block', margin: '14px 0' }}>
               <img src={qrModal.qrImg} alt="QR" style={{ width: 180, height: 180 }} />
             </div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#4ade80', marginBottom: 12 }}>
+            <div style={{ fontSize: '1.241rem', fontWeight: 800, color: 'var(--color-success)', marginBottom: 12 }}>
               Bs. {qrModal.monto}
             </div>
             <button

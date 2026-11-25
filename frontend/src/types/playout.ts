@@ -28,6 +28,11 @@ export interface PlaylistItem {
   out_point_ms?: number;
   timing_mode: TimingMode;
   scheduled_time: string | null;
+  scheduled_spots?: number;
+  pauta_id?: number;
+  cue_label?: string;
+  group_id?: string | null;
+  program_title?: string | null;
   status: ItemStatus | AuditStatus;
   error_message?: string | null;
   show_graphics?: boolean;
@@ -177,31 +182,30 @@ export interface DeckLinkStatus {
 
 export interface AsRunLog {
   id: number;
-  session_id?: string;
-  playlist_item_id?: number | null;
-  timestamp: string;
-  event_title: string;
-  file_path: string;
+  item_id: number;
+  pauta_id: number | null;
+  title: string;
+  program_title: string | null;
+  file_path: string | null;
   event_type: EventType;
-  source_type?: string;
   planned_start: string | null;
-  actual_start: string;
-  actual_end: string;
+  started_at: string | null;
+  ended_at: string | null;
   planned_duration_ms: number;
   actual_duration_ms: number;
-  duration_discrepancy_ms: number;
-  status: string;
-  error_code?: string;
-  operator_notes: string;
-  decklink_profile: string;
+  discrepancy_ms: number;
+  broadcast_status: string;
+  operator: string | null;
+  notes: string | null;
 }
 
 export interface AuditStats {
-  totalEmissions: number;
-  todayEmissions: number;
-  totalBroadcastTimeMs: number;
-  successRate: string;
-  activeIncidents: number;
+  total_broadcasts: number;
+  today_broadcasts: number;
+  successful_broadcasts: number;
+  failed_broadcasts: number;
+  total_duration_hours: number;
+  uptime_percentage: number | null;
 }
 
 export interface SystemIncident {

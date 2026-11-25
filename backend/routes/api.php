@@ -24,12 +24,22 @@ Route::post('/pagos/callback', [PlayoutBmsController::class, 'handlePagoFacilCal
 Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'confirmarPago']);
 
 // Rutas de Playout Web, Auditoría e Incidentes
+Route::get('/parrilla/qc', [PlayoutBmsController::class, 'getQualityFiles'])->middleware('auth:sanctum');
+Route::post('/parrilla/qc/{archivo}', [PlayoutBmsController::class, 'analyzeQualityFile'])->middleware('auth:sanctum');
+Route::get('/parrilla/archivos', [PlayoutBmsController::class, 'getParrillaFiles'])->middleware('auth:sanctum');
+Route::post('/parrilla/archivos', [PlayoutBmsController::class, 'storeParrillaFile'])->middleware('auth:sanctum');
+Route::post('/parrilla/bloques', [PlayoutBmsController::class, 'addParrillaBlock'])->middleware('auth:sanctum');
+Route::post('/parrilla/media', [PlayoutBmsController::class, 'uploadPlayoutMedia'])->middleware('auth:sanctum');
+Route::get('/parrilla/media/{file}', [PlayoutBmsController::class, 'getPlayoutMedia'])
+    ->where('file', '[A-Za-z0-9]+\.(?:mp4|webm|ogg|ogv)');
+Route::post('/parrilla/emisiones', [PlayoutBmsController::class, 'recordPlayoutCompletion'])->middleware('auth:sanctum');
 Route::get('/playlist', [PlayoutBmsController::class, 'getPlayoutPlaylist']);
-Route::post('/playlist/replace', [PlayoutBmsController::class, 'replacePlayoutPlaylist']);
-Route::post('/playlist/items', [PlayoutBmsController::class, 'addPlayoutItem']);
-Route::delete('/playlist/items/{id}', [PlayoutBmsController::class, 'deletePlayoutItem']);
-Route::post('/playlist/clear', [PlayoutBmsController::class, 'clearPlayoutPlaylist']);
+Route::post('/playlist/replace', [PlayoutBmsController::class, 'replacePlayoutPlaylist'])->middleware('auth:sanctum');
+Route::post('/playlist/items', [PlayoutBmsController::class, 'addPlayoutItem'])->middleware('auth:sanctum');
+Route::delete('/playlist/items/{id}', [PlayoutBmsController::class, 'deletePlayoutItem'])->middleware('auth:sanctum');
+Route::post('/playlist/clear', [PlayoutBmsController::class, 'clearPlayoutPlaylist'])->middleware('auth:sanctum');
 
+Route::get('/audit/export/csv', [PlayoutBmsController::class, 'exportAuditCsv']);
 Route::get('/audit/logs', [PlayoutBmsController::class, 'getAuditLogs']);
 Route::get('/audit/stats', [PlayoutBmsController::class, 'getAuditStats']);
 Route::get('/audit/incidents', [PlayoutBmsController::class, 'getIncidents']);
@@ -73,15 +83,17 @@ Route::prefix('v1')->group(function () {
 
     // CU5: Control de Calidad QC
     Route::get('/validaciones', [PlayoutBmsController::class, 'getValidaciones']);
-    Route::post('/validaciones', [PlayoutBmsController::class, 'validarItem']);
+    Route::post('/validaciones', [PlayoutBmsController::class, 'validarItem'])->middleware('auth:sanctum');
 
     // CU6: Pautas, Spots y Clientes
     Route::get('/clientes', [PlayoutBmsController::class, 'getClientes']);
     Route::post('/clientes', [PlayoutBmsController::class, 'createCliente']);
     Route::get('/spots', [PlayoutBmsController::class, 'getSpots']);
     Route::post('/spots', [PlayoutBmsController::class, 'createSpot']);
+    Route::put('/spots/{spot}/archivo', [PlayoutBmsController::class, 'linkSpotFile'])->middleware('auth:sanctum');
     Route::get('/pautas', [PlayoutBmsController::class, 'getPautas']);
-    Route::post('/pautas', [PlayoutBmsController::class, 'createPauta']);
+    Route::post('/pautas', [PlayoutBmsController::class, 'createPauta'])->middleware('auth:sanctum');
+    Route::delete('/pautas/{pauta}', [PlayoutBmsController::class, 'cancelPauta'])->middleware('auth:sanctum');
 
     // CU7: Emisión Real (As-Run Log)
     Route::get('/emisiones', [PlayoutBmsController::class, 'getEmisiones']);

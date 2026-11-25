@@ -8,6 +8,7 @@ class ItemParrilla extends Model
 {
     protected $table = 'item_parrilla';
     public $timestamps = false;
+    protected $casts = ['media_playout' => 'array'];
     protected $fillable = [
         'id_parrilla',
         'id_programa',
@@ -15,7 +16,8 @@ class ItemParrilla extends Model
         'hora_fin',
         'tipo_emision',
         'estado',
-        'observaciones'
+        'observaciones',
+        'media_playout'
     ];
 
     public function parrilla()
@@ -31,6 +33,11 @@ class ItemParrilla extends Model
     public function validaciones()
     {
         return $this->hasMany(ValidacionEmision::class, 'id_item_parrilla');
+    }
+
+    public function ultimaValidacion()
+    {
+        return $this->hasOne(ValidacionEmision::class, 'id_item_parrilla')->latestOfMany();
     }
 
     public function pautas()

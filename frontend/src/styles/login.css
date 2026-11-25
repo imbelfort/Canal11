@@ -1,0 +1,32 @@
+﻿.login-card {
+  display: grid;
+  width: min(100%, 28rem);
+  gap: 1.25rem;
+  padding: clamp(1rem, 4vw, 2rem);
+  border: 1px solid var(--color-hairline);
+  border-radius: var(--profile-radius);
+  background: var(--color-canvas-soft);
+  box-shadow: 0 12px 34px #0002, 0 4px 0 #0001;
+}
+.login-card-with-demo { width: min(100%, 47rem); grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); }
+.login-heading { display: flex; align-items: center; gap: .9rem; grid-column: 1 / -1; padding-bottom: .9rem; border-bottom: 1px solid var(--color-hairline); }
+.login-mark { display: grid; place-items: center; width: 3rem; height: 3rem; flex: 0 0 3rem; border-radius: var(--profile-radius); background: var(--color-accent-subtle); color: var(--color-accent); }
+.login-heading h1 { margin: 0; font-size: clamp(1.35rem, 4vw, 1.85rem); line-height: 1.15; }
+.login-heading p, .login-demo p { margin: .3rem 0 0; color: var(--color-text-muted); }
+.login-form fieldset, .login-demo { display: grid; gap: .55rem; margin: 0; padding: 0; border: 0; min-width: 0; }
+.login-demo p { margin: 0 0 .2rem; font-size: .86rem; }
+.login-demo legend, .login-form label { font-weight: 650; }
+.login-role, .login-field { display: flex; align-items: center; gap: .65rem; min-height: 2.7rem; border: 1px solid var(--color-hairline); border-radius: 9px; background: var(--color-field); color: inherit; }
+.login-role { text-align: start; padding: .45rem .6rem; cursor: pointer; }
+.login-role span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.login-role svg, .login-field > svg { flex-shrink: 0; color: var(--color-accent); }
+.login-role[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-subtle); }
+.login-field { padding-inline: .65rem .25rem; }
+.login-field:focus-within { border-color: var(--color-accent); }
+.login-field input { display: block; width: 100%; min-width: 0; padding-block: .55rem; background: transparent; border: 0; color: inherit; }
+.login-form label:not(:first-child) { margin-top: .35rem; }
+.login-reveal { display: grid; place-items: center; flex: 0 0 2.1rem; height: 2.1rem; border: 0; border-radius: 7px; background: transparent; color: var(--color-ink-soft); cursor: pointer; }
+.login-submit { display: flex; align-items: center; justify-content: center; gap: .55rem; margin-top: .55rem; padding: .65rem; min-height: 2.75rem; border: 1px solid transparent; border-radius: 9px; background: var(--profile-accent); color: white; font-weight: 700; cursor: pointer; box-shadow: 0 3px 0 #0003; }
+.login-error { display: flex; gap: .45rem; margin: .3rem 0 0; padding: .5rem; border: 1px solid var(--color-live); border-radius: 8px; background: var(--color-live-subtle); color: var(--color-live-on-subtle); }
+.login-error svg { flex-shrink: 0; }
+@media (max-width: 650px) { .login-card-with-demo { grid-template-columns: 1fr; } }

@@ -20,13 +20,13 @@ if not exist "backend\.env" (
 
 echo.
 echo [2/3] Levantando Servidor Backend (Laravel API en puerto 8000)...
-start "Backend - Laravel API (Puerto 8000)" cmd /k "cd /d %~dp0backend && php artisan serve --port=8000"
+start "Backend - Laravel API (Puerto 8000)" cmd /k "cd backend\public && php -d upload_max_filesize=512M -d post_max_size=520M -S 127.0.0.1:8000 -t . ..\vendor\laravel\framework\src\Illuminate\Foundation\resources\server.php"
 
 timeout /t 2 /nobreak >nul
 
 echo.
 echo [3/3] Levantando Servidor Frontend (Vite React en puerto 5173)...
-start "Frontend - Vite Playout (Puerto 5173)" cmd /k "cd /d %~dp0frontend && npm run dev"
+start "Frontend - Vite Playout (Puerto 5173)" cmd /k "cd frontend && npm run dev"
 
 timeout /t 3 /nobreak >nul
 

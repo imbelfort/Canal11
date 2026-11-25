@@ -1,326 +1,153 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { AsRunLog, AuditStats as AuditStatsType } from '../../types/playout';
+﻿import { Fragment, useEffect, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react';
+import type { AsRunLog, AuditStats as AuditStatsData } from '../../types/playout';
 import { AuditStats } from './AuditStats';
 import { api } from '../../services/api';
-import {
-  Download,
-  RefreshCw,
-  Search,
-  FileText,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  HardDrive
-} from 'lucide-react';
 import { ErrorAlertBanner } from '../Common/ErrorAlertBanner';
 
-export const AuditView: React.FC = () => {
-  const [logs, setLogs] = useState<AsRunLog[]>([]);
-  const [total, setTotal] = useState<number>(0);
-  const [stats, setStats] = useState<AuditStatsType | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [searchTerm, setSearchTerm] = useState<string>('');
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(50);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+const columns = ['Fecha', 'Contenido', 'Inicio previsto', 'Inicio real', 'Fin real', 'Duración', 'Diferencia', 'Estado'];
+const statusLabels: Record<string, string> = {
+  EMITIDO_CORRECTO: 'Emitido',
+  DESPLAZADO: 'Desplazado',
+  CORTE_ENERGIA: 'Corte de energía',
+  FALLA_TECNICA: 'Falla técnica',
+  INTERRUPCION_NOTICIOSA: 'Interrupción noticiosa',
+  NO_EMITIDO: 'No emitido',
+};
+const date = new Intl.DateTimeFormat('es-BO', { dateStyle: 'short', timeZone: 'America/La_Paz' });
+const time = new Intl.DateTimeFormat('es-BO', { timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+const number = new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 });
+const datePart = (formatter: Intl.DateTimeFormat, value: string | null) => {
+  if (!value) return '—';
+  const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T') + '-04:00');
+  return Number.isNaN(parsed.getTime()) ? '—' : formatter.format(parsed);
+};
+const seconds = (ms: number) => `${number.format(ms / 1000)} s`;
 
+export function AuditView() {
+  const [logs, setLogs] = useState<AsRunLog[]>([]);
+  const [total, setTotal] = useState(0);
+  const [stats, setStats] = useState<AuditStatsData | null>(null);
+  const [status, setStatus] = useState('ALL');
+  const [draft, setDraft] = useState('');
+  const [search, setSearch] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [revision, setRevision] = useState(0);
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const fetchData = async (targetPage = page) => {
-    setIsLoading(true);
-    try {
-      const offset = (targetPage - 1) * pageSize;
-      const [logsData, statsData] = await Promise.all([
-        api.getAuditLogs({
-          status: statusFilter,
-          search: searchTerm,
-          limit: pageSize,
-          offset
-        }),
-        api.getAuditStats()
-      ]);
-      const list = Array.isArray(logsData?.logs) ? logsData.logs : (Array.isArray(logsData) ? logsData : []);
-      setLogs(list);
-      setTotal(typeof logsData?.total === 'number' ? logsData.total : list.length);
-      setStats(statsData);
-      setErrorMessage(null);
-    } catch (e: any) {
-      const detail = e instanceof Error ? e.message : 'Error desconocido al consultar registros de auditoría';
-      setErrorMessage(`No se pudo obtener la auditoría As-Run: ${detail}`);
-      console.error('[AuditView] Error al cargar auditoría:', e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Carga inicial y ante cambio de filtros o página
   useEffect(() => {
-    fetchData(page);
-  }, [page, pageSize, statusFilter]);
+    let active = true;
+    const fetchLogs = async () => {
+      try {
+        const [result, summary] = await Promise.all([
+          api.getAuditLogs({ status, search, startDate, endDate, limit: pageSize, offset: (page - 1) * pageSize }),
+          api.getAuditStats(),
+        ]);
+        if (!active) return;
+        const lastPage = Math.max(1, Math.ceil(result.total / pageSize));
+        if (page > lastPage) {
+          setPage(lastPage);
+          return;
+        }
+        setLogs(result.logs);
+        setTotal(result.total);
+        setStats(summary);
+        setError('');
+      } catch (err) {
+        if (active) setError((err as Error).message);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    setLoading(true);
+    void fetchLogs();
+    const timer = page === 1 && !search && !startDate && !endDate ? window.setInterval(fetchLogs, 10_000) : undefined;
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [status, search, startDate, endDate, page, pageSize, revision]);
 
-  // Actualización periódica sólo si el operador está en la primera página y sin búsqueda activa
-  useEffect(() => {
-    if (page !== 1 || searchTerm.trim().length > 0) return;
-    const interval = setInterval(() => {
-      fetchData(1);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [page, pageSize, statusFilter, searchTerm]);
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-    fetchData(1);
-  };
-
-  const handleExportCsv = () => {
-    try {
-      const url = api.getExportCsvUrl({ status: statusFilter, search: searchTerm });
-      window.open(url, '_blank');
-    } catch (e: any) {
-      setErrorMessage(`Error al generar enlace de descarga CSV: ${e.message}`);
-    }
-  };
-
-  const startIdx = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const endIdx = Math.min(page * pageSize, total);
+  const reload = () => setRevision(value => value + 1);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+    <div className="audit-screen">
+      <header className="audit-heading">
+        <div><h1>Bitácora As-Run</h1><p>{total} registros · Hora de Bolivia (UTC−4)</p></div>
+        <div className="operations-actions">
+          <button type="button" disabled={loading} onClick={reload}><RefreshCw size={15} /> Actualizar</button>
+          <a className="btn-tool primary" href={api.getExportCsvUrl({ status, search, startDate, endDate })}><Download size={15} /> Exportar CSV</a>
+        </div>
+      </header>
       <AuditStats stats={stats} />
-
-      {errorMessage && (
-        <ErrorAlertBanner
-          title="Aviso de Auditoría"
-          message={errorMessage}
-          onRetry={() => fetchData(page)}
-          onDismiss={() => setErrorMessage(null)}
-        />
-      )}
-
-      <div className="audit-toolbar" style={{ flexShrink: 0 }}>
-        <div className="toolbar-group">
-          <select
-            className="btn-tool"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="ALL">Todos los Estados</option>
-            <option value="PLAYED_SUCCESS">Solo Exitosos</option>
-            <option value="FILE_CORRUPT_OR_MISSING">Solo Fallas / No encontrados</option>
-            <option value="INTERRUPTED">Interrumpidos</option>
-            <option value="EMERGENCY_FALLBACK">Cortinillas de Emergencia</option>
-          </select>
-
-          <form onSubmit={handleSearchSubmit} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-            <Search size={13} style={{ position: 'absolute', left: 8, color: 'var(--text-tertiary)' }} />
-            <input
-              type="text"
-              placeholder="Buscar por título o archivo..."
-              className="btn-tool"
-              style={{ paddingLeft: 26, width: 220 }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </form>
-
-          <button className="btn-tool" onClick={() => fetchData(page)} disabled={isLoading} title="Refrescar lista actual">
-            <RefreshCw size={12} className={isLoading ? 'spinning' : ''} />
-            <span>Actualizar</span>
-          </button>
-        </div>
-
-        <div className="toolbar-group">
-          <button
-            className="btn-tool"
-            onClick={() => {
-              const url = api.getDailyReportTxtUrl();
-              window.open(url, '_blank');
-            }}
-            title="Descargar reporte oficial de continuidad del día en texto plano físico (AsRun_YYYY-MM-DD.txt)"
-          >
-            <FileText size={13} color="var(--apple-green)" />
-            <span>As-Run del Día (TXT Físico)</span>
-          </button>
-
-          <button className="btn-tool primary" onClick={handleExportCsv} title="Descargar exportación completa de auditoría en formato CSV">
-            <Download size={13} />
-            <span>Descargar As-Run (CSV)</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Tabla con scroll independiente */}
-      <div className="table-scroll-container" style={{ flex: 1, overflowY: 'auto' }}>
+      {error && <ErrorAlertBanner title="No se pudo cargar la Bitácora" message={error} onRetry={reload} onDismiss={() => setError('')} />}
+      <form className="audit-filters" onSubmit={event => {
+        event.preventDefault();
+        setPage(1);
+        setSearch(draft.trim());
+      }}>
+        <label>Buscar<input type="search" value={draft} maxLength={150} placeholder="Contenido, archivo u operador" onChange={event => setDraft(event.target.value)} /></label>
+        <label>Estado<select value={status} onChange={event => { setStatus(event.target.value); setPage(1); }}>
+          <option value="ALL">Todos los estados</option>
+          {Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select></label>
+        <label>Desde<input type="date" value={startDate} max={endDate || undefined} onChange={event => { setStartDate(event.target.value); setPage(1); }} /></label>
+        <label>Hasta<input type="date" value={endDate} min={startDate || undefined} onChange={event => { setEndDate(event.target.value); setPage(1); }} /></label>
+        <button type="submit" className="btn-tool"><Search size={15} /> Buscar</button>
+      </form>
+      <div className="table-scroll-container audit-log-table" tabIndex={0} aria-label="Registros de emisión" aria-busy={loading}>
         <table className="playlist-table">
-          <thead>
-            <tr>
-              <th style={{ width: 50 }}>ID</th>
-              <th style={{ width: 90 }}>Fecha</th>
-              <th style={{ width: 80 }}>Inicio</th>
-              <th style={{ width: 80 }}>Fin</th>
-              <th>Título del Contenido</th>
-              <th>Ruta del Archivo</th>
-              <th style={{ width: 80 }}>Plan</th>
-              <th style={{ width: 80 }}>Real</th>
-              <th style={{ width: 70 }}>Discrep.</th>
-              <th style={{ width: 110 }}>Estado</th>
-            </tr>
-          </thead>
+          <thead><tr>{columns.map(column => <th key={column} scope="col">{column}</th>)}</tr></thead>
           <tbody>
-            {logs.length === 0 ? (
-              <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: 30, color: 'var(--text-tertiary)' }}>
-                  {isLoading ? 'Cargando registros de auditoría...' : 'No hay registros de auditoría para los filtros aplicados.'}
-                </td>
-              </tr>
-            ) : (
-              logs.map((log) => {
-                const plannedSec = ((log.planned_duration_ms || 0) / 1000).toFixed(1);
-                const actualSec = ((log.actual_duration_ms || 0) / 1000).toFixed(1);
-                const diffSec = ((log.duration_discrepancy_ms || 0) / 1000).toFixed(1);
-
-                let badge = <span className="badge-status played">Emitido</span>;
-                if (log.status === 'FILE_CORRUPT_OR_MISSING' || log.status === 'ERROR') {
-                  badge = <span className="badge-status error">No Encontrado</span>;
-                } else if (log.status === 'INTERRUPTED') {
-                  badge = <span className="badge-status" style={{ background: 'rgba(255, 159, 10, 0.15)', color: 'var(--apple-orange)' }}>Cortado</span>;
-                } else if (log.status === 'EMERGENCY_FALLBACK') {
-                  badge = <span className="badge-status" style={{ background: 'rgba(255, 69, 58, 0.15)', color: 'var(--apple-red)' }}>Respaldo</span>;
-                }
-
-                return (
-                  <tr key={log.id}>
-                    <td style={{ color: 'var(--text-tertiary)' }}>{log.id}</td>
-                    <td>{log.timestamp ? log.timestamp.slice(0, 10) : ''}</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>
-                      {log.actual_start ? (() => {
-                        try {
-                          return new Date(log.actual_start).toLocaleTimeString();
-                        } catch {
-                          return String(log.actual_start);
-                        }
-                      })() : ''}
+            {!logs.length && <tr><td colSpan={columns.length}>{loading ? 'Cargando emisiones…' : 'No hay emisiones que coincidan con los filtros.'}</td></tr>}
+            {logs.map(log => {
+              const commercial = log.event_type === 'COMMERCIAL';
+              const open = expanded === log.id;
+              return (
+                <Fragment key={log.id}>
+                  <tr>
+                    <td>{datePart(date, log.started_at)}</td>
+                    <td><button type="button" className="audit-entry-title" aria-expanded={open} onClick={() => setExpanded(open ? null : log.id)}>{log.title}</button>
+                      <small>{log.pauta_id ? 'Spot pautado' : commercial ? 'Corte' : 'Segmento'}{log.program_title && log.program_title !== log.title ? ` · ${log.program_title}` : ''}</small>
                     </td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>
-                      {log.actual_end ? (() => {
-                        try {
-                          return new Date(log.actual_end).toLocaleTimeString();
-                        } catch {
-                          return String(log.actual_end);
-                        }
-                      })() : ''}
-                    </td>
-                    <td><strong>{log.event_title}</strong></td>
-                    <td style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
-                      {log.file_path}
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{plannedSec}s</td>
-                    <td style={{ fontFamily: 'var(--font-mono)' }}>{actualSec}s</td>
-                    <td style={{ fontFamily: 'var(--font-mono)', color: Number(diffSec) < 0 ? 'var(--apple-red)' : 'var(--apple-green)' }}>
-                      {diffSec}s
-                    </td>
-                    <td>{badge}</td>
+                    <td>{log.planned_start?.slice(0, 8) || '—'}</td>
+                    <td>{datePart(time, log.started_at)}</td>
+                    <td>{datePart(time, log.ended_at)}</td>
+                    <td><strong>{seconds(log.actual_duration_ms)}</strong><small>Prevista {seconds(log.planned_duration_ms)}</small></td>
+                    <td>{log.discrepancy_ms > 0 ? '+' : ''}{seconds(log.discrepancy_ms)}</td>
+                    <td><span className="audit-status" data-state={log.broadcast_status}>{statusLabels[log.broadcast_status] ?? log.broadcast_status}</span></td>
                   </tr>
-                );
-              })
-            )}
+                  {open && <tr className="audit-entry-details"><td colSpan={columns.length}>
+                    <dl>
+                      <div><dt>Registro</dt><dd>#{log.id} · Bloque #{log.item_id}{log.pauta_id ? ` · Pauta #${log.pauta_id}` : ''}</dd></div>
+                      <div><dt>Operador</dt><dd>{log.operator || '—'}</dd></div>
+                      <div><dt>Archivo</dt><dd>{log.file_path || '—'}</dd></div>
+                      <div><dt>Observaciones</dt><dd>{log.notes || '—'}</dd></div>
+                    </dl>
+                  </td></tr>}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
-
-      {/* Barra de Paginación y Respaldo Físico */}
-      <footer style={{
-        padding: '6px 14px',
-        background: 'var(--color-canvas-soft)',
-        borderTop: '1px solid var(--border-subtle)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexShrink: 0,
-        gap: 12,
-        fontSize: 11
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--color-text-muted)' }}>
-          <HardDrive size={13} color="var(--color-primary)" />
-          <span>
-            Mostrando <strong>{startIdx} - {endIdx}</strong> de <strong>{total}</strong> emisiones en base de datos • Historial permanente respaldado en archivos físicos diarios TXT
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--color-text-muted)' }}>
-            <span>Filas:</span>
-            <select
-              className="btn-tool"
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-              style={{ padding: '2px 6px', height: 24, fontSize: 11 }}
-            >
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-              <option value={250}>250</option>
-            </select>
-          </label>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-            <button
-              type="button"
-              className="btn-tool"
-              onClick={() => setPage(1)}
-              disabled={page <= 1 || isLoading}
-              title="Primera Página"
-              style={{ padding: '2px 6px', height: 24 }}
-            >
-              <ChevronsLeft size={13} />
-            </button>
-            <button
-              type="button"
-              className="btn-tool"
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page <= 1 || isLoading}
-              title="Página Anterior"
-              style={{ padding: '2px 6px', height: 24 }}
-            >
-              <ChevronLeft size={13} />
-            </button>
-
-            <span style={{ padding: '0 6px', fontWeight: 600, color: 'var(--color-ink)' }}>
-              Página {page} de {totalPages}
-            </span>
-
-            <button
-              type="button"
-              className="btn-tool"
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages || isLoading}
-              title="Página Siguiente"
-              style={{ padding: '2px 6px', height: 24 }}
-            >
-              <ChevronRight size={13} />
-            </button>
-            <button
-              type="button"
-              className="btn-tool"
-              onClick={() => setPage(totalPages)}
-              disabled={page >= totalPages || isLoading}
-              title="Última Página"
-              style={{ padding: '2px 6px', height: 24 }}
-            >
-              <ChevronsRight size={13} />
-            </button>
-          </div>
+      <footer className="audit-pagination">
+        <span>{total ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} de ${total}` : '0 resultados'}</span>
+        <label>Filas <select className="btn-tool" value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}>
+          {[25, 50, 100, 250].map(size => <option key={size}>{size}</option>)}
+        </select></label>
+        <div className="operations-actions">
+          <button type="button" disabled={page === 1 || loading} aria-label="Página anterior" onClick={() => setPage(page - 1)}><ChevronLeft size={16} /></button>
+          <span>Página {page} de {totalPages}</span>
+          <button type="button" disabled={page >= totalPages || loading} aria-label="Página siguiente" onClick={() => setPage(page + 1)}><ChevronRight size={16} /></button>
         </div>
       </footer>
     </div>
   );
-};
+}

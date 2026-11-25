@@ -10,6 +10,7 @@ class SpotPublicitario extends Model
     public $timestamps = false;
     protected $fillable = [
         'id_cliente',
+        'id_archivo_parrilla',
         'codigo_spot',
         'titulo_spot',
         'duracion_segundos',
@@ -17,6 +18,11 @@ class SpotPublicitario extends Model
         'fecha_vigencia_fin',
         'estado'
     ];
+
+    public function archivo()
+    {
+        return $this->belongsTo(ArchivoParrilla::class, 'id_archivo_parrilla');
+    }
 
     public function cliente()
     {

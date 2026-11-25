@@ -10,6 +10,7 @@ class EmisionRealLog extends Model
     public $timestamps = false;
     protected $fillable = [
         'id_item_parrilla',
+        'id_pauta_comercial',
         'id_material_video',
         'hora_inicio_real',
         'hora_fin_real',
@@ -20,6 +21,11 @@ class EmisionRealLog extends Model
         'observaciones',
         'fecha_registro'
     ];
+
+    public function pauta()
+    {
+        return $this->belongsTo(PautaComercial::class, 'id_pauta_comercial');
+    }
 
     public function itemParrilla()
     {

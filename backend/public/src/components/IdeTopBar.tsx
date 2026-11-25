@@ -14,7 +14,6 @@ interface IdeTopBarProps {
   onOpenNdiModal?: () => void;
   onOpenAudioModal?: () => void;
   onOpenGraphicsModal?: () => void;
-  onOpenEmergencyModal?: () => void;
   onOpenNetworkModal?: () => void;
   onOpenAboutModal?: () => void;
   onPlaylistUpdated: () => void;
@@ -34,7 +33,6 @@ export const IdeTopBar: React.FC<IdeTopBarProps> = ({
   onOpenNdiModal,
   onOpenAudioModal,
   onOpenGraphicsModal,
-  onOpenEmergencyModal,
   onOpenNetworkModal,
   onOpenAboutModal,
   onOpenExitModal,
@@ -268,9 +266,6 @@ export const IdeTopBar: React.FC<IdeTopBarProps> = ({
                 <span className="ide-shortcut">F9</span>
               </div>
               <div className="ide-menu-divider" />
-              <div className="ide-menu-item" onClick={() => { onOpenEmergencyModal?.(); setOpenMenu(null); }}>
-                <span>Cortinilla de Emergencia...</span>
-              </div>
               <div className="ide-menu-item" onClick={() => { onOpenNetworkModal?.(); setOpenMenu(null); }}>
                 <span>Acceso Red Local (LAN)...</span>
               </div>

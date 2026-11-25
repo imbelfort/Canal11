@@ -1,42 +1,21 @@
-import React from 'react';
-import { AuditStats as AuditStatsType } from '../../types/playout';
-import { BarChart2, CheckCircle2, Calendar, AlertOctagon } from 'lucide-react';
+﻿import { BarChart2, Calendar, CheckCircle2, AlertOctagon } from 'lucide-react';
+import type { AuditStats as AuditStatsData } from '../../types/playout';
 
-interface AuditStatsProps {
-  stats: AuditStatsType | null;
-}
-
-export const AuditStats: React.FC<AuditStatsProps> = ({ stats }) => {
+export function AuditStats({ stats }: { stats: AuditStatsData | null }) {
+  const entries = [
+    { label: 'Histórico', value: stats?.total_broadcasts, icon: BarChart2 },
+    { label: 'Hoy', value: stats?.today_broadcasts, icon: Calendar },
+    { label: 'Emitidos correctamente', value: stats?.successful_broadcasts, icon: CheckCircle2 },
+    { label: 'Fallidos o no emitidos', value: stats?.failed_broadcasts, icon: AlertOctagon },
+  ];
   return (
-    <div className="stats-bar">
-      <div className="stat-metric">
-        <span className="num">{stats?.totalEmissions || 0}</span>
-        <span className="lbl">
-          <BarChart2 size={11} />
-          Total Emisiones
-        </span>
-      </div>
-      <div className="stat-metric">
-        <span className="num">{stats?.todayEmissions || 0}</span>
-        <span className="lbl">
-          <Calendar size={11} />
-          Emitidos Hoy
-        </span>
-      </div>
-      <div className="stat-metric">
-        <span className="num" style={{ color: 'var(--apple-green)' }}>{stats?.successRate || '100%'}</span>
-        <span className="lbl">
-          <CheckCircle2 size={11} />
-          Cumplimiento
-        </span>
-      </div>
-      <div className="stat-metric">
-        <span className="num" style={{ color: 'var(--apple-red)' }}>{stats?.activeIncidents || 0}</span>
-        <span className="lbl">
-          <AlertOctagon size={11} />
-          Incidentes
-        </span>
-      </div>
+    <div className="stats-bar" aria-label="Resumen histórico de emisiones">
+      {entries.map(({ label, value, icon: Icon }) => (
+        <div className="stat-metric" key={label}>
+          <span className="num">{value ?? '—'}</span>
+          <span className="lbl"><Icon size={14} aria-hidden="true" /> {label}</span>
+        </div>
+      ))}
     </div>
   );
-};
+}

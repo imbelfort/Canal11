@@ -1,6 +1,12 @@
 import { PlaylistItem, AddPlaylistItemDto } from '../../types/playout';
 import { BASE_URL, requestJson, requestVoid } from './client';
 
+const operatorHeaders = () => ({
+  'Content-Type': 'application/json',
+  Accept: 'application/json',
+  Authorization: 'Bearer ' + (localStorage.getItem('playout_token') || ''),
+});
+
 export const playlistApi = {
   async getPlaylist(): Promise<{ playlist: any; items: PlaylistItem[] }> {
     const data = await requestJson<{ playlist: any; items: PlaylistItem[] }>(`${BASE_URL}/playlist`);
@@ -14,7 +20,7 @@ export const playlistApi = {
   async addItems(items: AddPlaylistItemDto[], insertAtIndex?: number): Promise<void> {
     await requestVoid(`${BASE_URL}/playlist/items`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: operatorHeaders(),
       body: JSON.stringify({ items, insertAtIndex })
     });
   },
@@ -37,7 +43,8 @@ export const playlistApi = {
 
   async deleteItem(id: string | number): Promise<void> {
     await requestVoid(`${BASE_URL}/playlist/items/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: operatorHeaders()
     });
   },
 
@@ -50,13 +57,13 @@ export const playlistApi = {
   },
 
   async clearPlaylist(): Promise<void> {
-    await requestVoid(`${BASE_URL}/playlist/clear`, { method: 'POST' });
+    await requestVoid(`${BASE_URL}/playlist/clear`, { method: 'POST', headers: operatorHeaders() });
   },
 
   async replacePlaylist(items: AddPlaylistItemDto[]): Promise<void> {
     await requestVoid(`${BASE_URL}/playlist/replace`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: operatorHeaders(),
       body: JSON.stringify({ items })
     });
   },

@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Usuario;
+use App\Models\ArchivoParrilla;
+use App\Services\MediaQualityCheck;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Rol;
 use App\Models\CategoriaPrograma;
 use App\Models\Programa;
@@ -82,7 +85,7 @@ class PlayoutBmsController extends Controller
         }
 
         // 4. Spots Publicitarios
-        $spots = SpotPublicitario::with('cliente')
+        $spots = SpotPublicitario::with(['cliente', 'archivo'])
             ->where('titulo_spot', 'ILIKE', "%{$q}%")
             ->orWhere('codigo_spot', 'ILIKE', "%{$q}%")
             ->limit(5)->get();
@@ -244,9 +247,9 @@ class PlayoutBmsController extends Controller
     public function createCategoria(Request $request)
     {
         $cat = CategoriaPrograma::create($request->validate([
-            'nombre' => 'required|string|unique:categoria_programa,nombre',
+            'nombre' => 'required|string|max:100|unique:categoria_programa,nombre',
             'descripcion' => 'nullable|string'
-        ]));
+        ], ['nombre.unique' => 'Ya existe una categoria con ese nombre. Seleccionala en la lista.']));
         return response()->json(['success' => true, 'categoria' => $cat]);
     }
 
@@ -258,9 +261,9 @@ class PlayoutBmsController extends Controller
     public function createPrograma(Request $request)
     {
         $validated = $request->validate([
-            'titulo' => 'required|string',
-            'id_categoria' => 'nullable|integer',
-            'duracion_estandar_minutos' => 'required|integer',
+            'titulo' => 'required|string|max:150',
+            'id_categoria' => 'nullable|integer|exists:categoria_programa,id',
+            'duracion_estandar_minutos' => 'required|integer|min:1',
             'codigo' => 'nullable|string',
             'descripcion' => 'nullable|string',
             'clasificacion_edad' => 'nullable|string',
@@ -300,16 +303,9 @@ class PlayoutBmsController extends Controller
 
     public function getParrillaHoy()
     {
-        $today = Carbon::today()->toDateString();
-        $parrilla = Parrilla::with(['programador', 'items.programa.materiales', 'items.validaciones', 'items.pautas.spot.cliente'])
-            ->where('fecha', $today)
+        $parrilla = $this->parrillaDeHoy()
+            ->with(['programador', 'items.programa.materiales', 'items.validaciones', 'items.pautas.spot.cliente'])
             ->first();
-
-        if (!$parrilla) {
-            $parrilla = Parrilla::with(['programador', 'items.programa.materiales', 'items.validaciones', 'items.pautas.spot.cliente'])
-                ->orderBy('fecha', 'desc')
-                ->first();
-        }
 
         return response()->json($parrilla);
     }
@@ -442,8 +438,8 @@ class PlayoutBmsController extends Controller
     public function validarItem(Request $request)
     {
         $validated = $request->validate([
-            'id_item_parrilla' => 'required|integer',
-            'resultado_qc' => 'required|string',
+            'id_item_parrilla' => 'required|integer|exists:item_parrilla,id',
+            'resultado_qc' => 'required|in:APROBADO_AIRE,RECHAZADO_FALLA_AUDIO,RECHAZADO_FALLA_VIDEO,RECHAZADO_SIN_MATERIAL,OBSERVADO,PENDIENTE',
             'id_material_video' => 'nullable|integer',
             'aspect_ratio' => 'nullable|string',
             'nivel_audio_db' => 'nullable|numeric',
@@ -452,29 +448,21 @@ class PlayoutBmsController extends Controller
 
         $item = ItemParrilla::find($validated['id_item_parrilla']);
         $matId = $validated['id_material_video'] ?? null;
-        if (!$matId && $item && $item->id_programa) {
+        if (!$matId && $item && $item->id_programa && !$item->media_playout) {
             $mat = MaterialVideo::where('id_programa', $item->id_programa)->orderBy('id', 'desc')->first();
             if ($mat) $matId = $mat->id;
         }
 
         $val = ValidacionEmision::create([
-            'id_item_parrilla' => $validated['id_item_parrilla'],
+            'id_item_parrilla' => $item->id,
             'id_material_video' => $matId,
-            'id_inspector_qc' => auth()->id() ?? 3,
+            'id_inspector_qc' => $request->user('sanctum')?->getKey() ?? 3,
             'resultado_qc' => $validated['resultado_qc'],
             'aspect_ratio' => $validated['aspect_ratio'] ?? '16:9',
-            'nivel_audio_db' => $validated['nivel_audio_db'] ?? -24.00,
-            'observaciones' => $validated['observaciones'] ?? 'Revisión técnica de sonido y luminancia',
-            'fecha_validacion' => Carbon::now()
+            'nivel_audio_db' => $validated['nivel_audio_db'] ?? -24,
+            'observaciones' => $validated['observaciones'] ?? null,
+            'fecha_validacion' => Carbon::now(),
         ]);
-
-        // Si fue aprobado en QC, actualizar el estado del bloque de parrilla a APROBADO_AIRE (según CU5)
-        if ($item) {
-            $item->estado = ($validated['resultado_qc'] === 'APROBADO' || $validated['resultado_qc'] === 'APROBADO_AIRE') 
-                ? 'APROBADO_AIRE' 
-                : 'RECHAZADO_QC';
-            $item->save();
-        }
 
         return response()->json(['success' => true, 'validacion' => $val->load(['itemParrilla.programa', 'materialVideo', 'inspector'])]);
     }
@@ -511,15 +499,16 @@ class PlayoutBmsController extends Controller
 
     public function getSpots()
     {
-        return response()->json(SpotPublicitario::with('cliente')->orderBy('id', 'asc')->get());
+        return response()->json(SpotPublicitario::with(['cliente', 'archivo'])->orderBy('id', 'asc')->get());
     }
 
     public function createSpot(Request $request)
     {
         $validated = $request->validate([
-            'id_cliente' => 'required|integer',
-            'titulo_spot' => 'required|string',
-            'duracion_segundos' => 'required|integer',
+            'id_cliente' => 'required|integer|exists:cliente_publicitario,id',
+            'id_archivo_parrilla' => 'nullable|integer|exists:archivo_parrilla,id',
+            'titulo_spot' => 'required|string|max:150',
+            'duracion_segundos' => 'required|integer|min:1',
             'codigo_spot' => 'nullable|string',
             'fecha_vigencia_inicio' => 'nullable|date',
             'fecha_vigencia_fin' => 'nullable|date'
@@ -532,6 +521,7 @@ class PlayoutBmsController extends Controller
 
         $spot = SpotPublicitario::create([
             'id_cliente' => $validated['id_cliente'],
+            'id_archivo_parrilla' => $validated['id_archivo_parrilla'] ?? null,
             'codigo_spot' => $validated['codigo_spot'],
             'titulo_spot' => $validated['titulo_spot'],
             'duracion_segundos' => $validated['duracion_segundos'],
@@ -540,7 +530,19 @@ class PlayoutBmsController extends Controller
             'estado' => 'ACTIVO'
         ]);
 
-        return response()->json(['success' => true, 'spot' => $spot->load('cliente')]);
+        return response()->json(['success' => true, 'spot' => $spot->load(['cliente', 'archivo'])]);
+    }
+
+    public function linkSpotFile(Request $request, SpotPublicitario $spot)
+    {
+        $data = $request->validate(['id_archivo_parrilla' => 'required|integer|exists:archivo_parrilla,id']);
+        $file = ArchivoParrilla::findOrFail($data['id_archivo_parrilla']);
+        $spot->update([
+            'id_archivo_parrilla' => $file->id,
+            'duracion_segundos' => max(1, (int) round($file->duracion_ms / 1000)),
+        ]);
+
+        return response()->json(['success' => true, 'spot' => $spot->load(['cliente', 'archivo'])]);
     }
 
     public function getPautas()
@@ -551,23 +553,42 @@ class PlayoutBmsController extends Controller
     public function createPauta(Request $request)
     {
         $validated = $request->validate([
-            'id_item_parrilla' => 'required|integer',
-            'id_spot' => 'required|integer',
-            'tanda_bloque' => 'required|string',
-            'orden' => 'nullable|integer',
-            'hora_estimada' => 'nullable|string'
+            'id_item_parrilla' => 'required|integer|exists:item_parrilla,id',
+            'id_spot' => 'required|integer|exists:spot_publicitario,id',
+            'tanda_bloque' => 'required|in:CORTE_1,CORTE_2,CORTE_3,CORTE_4,INICIO_PROGRAMA,FIN_PROGRAMA',
+            'orden' => 'nullable|integer|min:1',
+            'hora_estimada' => 'nullable|date_format:H:i',
         ]);
 
-        $pauta = PautaComercial::create([
-            'id_item_parrilla' => $validated['id_item_parrilla'],
-            'id_spot' => $validated['id_spot'],
-            'tanda_bloque' => $validated['tanda_bloque'],
-            'orden' => $validated['orden'] ?? 1,
-            'hora_estimada' => $validated['hora_estimada'] ?? null,
-            'estado' => 'PAUTADO'
-        ]);
+        $pauta = DB::transaction(function () use ($validated) {
+            $item = ItemParrilla::query()->lockForUpdate()->findOrFail($validated['id_item_parrilla']);
+            $todayId = $this->parrillaDeHoy()->value('id');
+            abort_if($item->id_parrilla !== $todayId || in_array($item->estado, ['EMITIDO', 'CANCELADO'])
+                || ($item->media_playout['event_type'] ?? 'VIDEO') === 'COMMERCIAL', 422,
+                'Selecciona un segmento pendiente de la Parrilla de hoy.');
+            $spot = SpotPublicitario::with('archivo')->findOrFail($validated['id_spot']);
+            abort_if($spot->estado !== 'ACTIVO' || !$spot->archivo, 422,
+                'El spot debe estar activo y tener un archivo de video vinculado.');
+            abort_if($spot->archivo->bloqueadoPorQc(), 422, 'El video del spot necesita aprobar el control técnico.');
 
-        return response()->json(['success' => true, 'pauta' => $pauta->load(['spot', 'itemParrilla'])]);
+            return $item->pautas()->create([
+                'id_spot' => $spot->id,
+                'tanda_bloque' => $validated['tanda_bloque'],
+                'orden' => $validated['orden'] ?? ((int) $item->pautas()->reorder()->max('orden') + 1),
+                'hora_estimada' => $validated['hora_estimada'] ?? null,
+                'estado' => 'PAUTADO',
+            ]);
+        });
+
+        return response()->json(['success' => true, 'pauta' => $pauta->load(['spot.cliente', 'itemParrilla.programa'])], 201);
+    }
+
+    public function cancelPauta(PautaComercial $pauta)
+    {
+        $changed = PautaComercial::whereKey($pauta->id)->where('estado', 'PAUTADO')->update(['estado' => 'CANCELADO']);
+        abort_if(!$changed && $pauta->fresh()?->estado !== 'CANCELADO', 409, 'El spot ya no esta pendiente.');
+
+        return response()->json(['success' => true]);
     }
 
     // ==========================================
@@ -581,7 +602,7 @@ class PlayoutBmsController extends Controller
     public function conciliarEmision(Request $request)
     {
         $validated = $request->validate([
-            'id_item_parrilla' => 'required|integer',
+            'id_item_parrilla' => 'required|integer|exists:item_parrilla,id',
             'discrepancia_segundos' => 'nullable|integer',
             'estado_emision' => 'nullable|string',
             'observaciones' => 'nullable|string'
@@ -668,297 +689,573 @@ class PlayoutBmsController extends Controller
     // ==========================================
     // INTEGRACIÓN API PLAYOUT (WEB)
     // ==========================================
+    private function parrillaDeHoy()
+    {
+        return Parrilla::whereDate('fecha', Carbon::today('America/La_Paz'))
+            ->where('canal_senial', 'SENIAL_PRINCIPAL_HD')
+            ->orderBy('id');
+    }
+
     public function getPlayoutPlaylist()
     {
-        // Obtener la parrilla activa o la de hoy
-        $hoy = Carbon::today()->toDateString();
-        $parrilla = Parrilla::with(['items.programa.materiales' => function ($q) {
-            $q->where('estado', 'LISTO');
-        }])->where('fecha', $hoy)->first();
+        $parrilla = $this->parrillaDeHoy()->with([
+            'items.ultimaValidacion',
+            'items.pautas.spot.archivo',
+            'items' => fn ($query) => $query->withCount(['pautas' => fn ($pautas) => $pautas->where('estado', 'PAUTADO')]),
+            'items.programa.materiales' => fn ($query) => $query->where('estado', 'LISTO')->orderByDesc('id'),
+        ])->first();
 
-        if (!$parrilla) {
-            $parrilla = Parrilla::with(['items.programa.materiales'])->orderBy('id', 'desc')->first();
-        }
+        $files = ArchivoParrilla::whereIn('ruta', $parrilla?->items->map(fn ($item) => $item->media_playout['file_path'] ?? null)->filter()->all() ?? [])
+            ->get()->keyBy('ruta');
+        $items = $parrilla?->items->flatMap(function (ItemParrilla $item) use ($files) {
+            $material = $item->programa?->materiales->first();
+            $media = $item->media_playout ?? [];
+            $path = $media['file_path'] ?? $material?->ruta_servidor;
 
-        $items = [];
-        if ($parrilla && $parrilla->items) {
-            foreach ($parrilla->items as $idx => $it) {
-                $mat = $it->programa && $it->programa->materiales->isNotEmpty() 
-                    ? $it->programa->materiales->first() 
-                    : null;
-                $duracionSec = $mat ? $mat->duracion_segundos : 1800;
-
-                $items[] = [
-                    'id' => $it->id,
-                    'title' => $it->programa ? $it->programa->titulo : ('Bloque ' . $it->hora_inicio),
-                    'file_path' => $mat ? $mat->ruta_servidor : ('/videos/bloque_' . $it->id . '.mp4'),
-                    'duration_ms' => $duracionSec * 1000,
-                    'in_point_ms' => 0,
-                    'out_point_ms' => 0,
-                    'event_type' => 'VIDEO',
+            $segment = [
+                'id' => $item->id,
+                'title' => $media['title'] ?? $item->programa?->titulo ?? 'Bloque ' . $item->hora_inicio,
+                'file_path' => $path,
+                'duration_ms' => $media['duration_ms'] ?? (($material?->duracion_segundos ?? 0) * 1000),
+                'in_point_ms' => $media['in_point_ms'] ?? 0,
+                'out_point_ms' => $media['out_point_ms'] ?? 0,
+                'event_type' => $media['event_type'] ?? 'VIDEO',
+                'timing_mode' => $media['timing_mode'] ?? 'AUTO_FOLLOW',
+                'scheduled_time' => $item->hora_inicio,
+                'scheduled_spots' => $item->pautas_count,
+                'group_id' => $media['group_id'] ?? null,
+                'program_title' => $media['program_title'] ?? $item->programa?->titulo,
+                'status' => match (true) {
+                    $item->estado === 'EMITIDO' => 'COMPLETED',
+                    $item->estado === 'CANCELADO' || $files->get($path)?->bloqueadoPorQc() || in_array($item->ultimaValidacion?->resultado_qc, ['OBSERVADO', 'RECHAZADO_FALLA_AUDIO', 'RECHAZADO_FALLA_VIDEO', 'RECHAZADO_SIN_MATERIAL'], true) => 'SKIPPED',
+                    !$path => 'MISSING',
+                    default => 'READY',
+                },
+            ];
+            $before = [];
+            $after = [];
+            $pautas = $item->pautas->sortBy([['orden', 'asc'], ['id', 'asc']]);
+            foreach ($pautas as $pauta) {
+                if (!in_array($pauta->estado, ['PAUTADO', 'EMITIDO'], true)) {
+                    continue;
+                }
+                $spot = $pauta->spot;
+                $isBefore = $pauta->tanda_bloque === 'INICIO_PROGRAMA';
+                $entry = [
+                    'id' => -$pauta->id,
+                    'pauta_id' => $pauta->id,
+                    'title' => $spot->titulo_spot,
+                    'file_path' => $spot->archivo?->ruta,
+                    'duration_ms' => $spot->archivo?->duracion_ms ?? $spot->duracion_segundos * 1000,
+                    'event_type' => 'COMMERCIAL',
                     'timing_mode' => 'AUTO_FOLLOW',
-                    'scheduled_time' => $it->hora_inicio,
-                    'status' => $it->estado === 'EMITIDO' ? 'COMPLETED' : 'READY',
-                    'programa_codigo' => $it->programa ? $it->programa->codigo : 'PRG-GEN',
-                    'channel' => 'Canal 11'
+                    'scheduled_time' => $pauta->hora_estimada,
+                    'group_id' => $segment['group_id'],
+                    'program_title' => $segment['program_title'],
+                    'cue_label' => ($isBefore ? 'Antes de ' : 'Después de ') . $segment['title'],
+                    'status' => match (true) {
+                        $pauta->estado === 'EMITIDO' => 'COMPLETED',
+                        $segment['status'] === 'SKIPPED' || $spot->estado !== 'ACTIVO' || $spot->archivo?->bloqueadoPorQc() => 'SKIPPED',
+                        !$spot->archivo => 'MISSING',
+                        default => 'READY',
+                    },
                 ];
+                if ($isBefore) $before[] = $entry;
+                else $after[] = $entry;
             }
-        }
+            return [...$before, $segment, ...$after];
+        }) ?? collect();
 
         return response()->json([
-            'playlist' => [
-                'id' => $parrilla ? $parrilla->id : 1,
-                'name' => $parrilla ? ($parrilla->descripcion . ' (' . $parrilla->fecha . ')') : 'Parrilla General',
-                'total_items' => count($items),
-                'loop_enabled' => false
-            ],
-            'items' => $items
+            'playlist' => ['id' => $parrilla?->id, 'name' => 'Parrilla de hoy', 'total_items' => $items->count()],
+            'items' => $items,
+        ]);
+    }
+
+    public function getParrillaFiles(Request $request)
+    {
+        $search = trim((string) $request->query('q', ''));
+        $stored = ArchivoParrilla::query()
+            ->when($search !== '', fn ($query) => $query->where('titulo', 'ILIKE', "%{$search}%"))
+            ->orderBy('titulo')->orderBy('id')->limit(100)->get()
+            ->map(fn ($file) => [
+                'id' => 'archivo:' . $file->id,
+                'titulo' => $file->titulo,
+                'ruta' => $file->ruta,
+                'duracion_ms' => $file->duracion_ms,
+                'origen' => 'Archivos subidos',
+                'qc' => $file->qc,
+            ]);
+        $mam = MaterialVideo::where('estado', 'LISTO')
+            ->whereNotExists(ArchivoParrilla::query()->whereColumn('archivo_parrilla.ruta', 'material_video.ruta_servidor')->toBase())
+            ->whereRaw('ruta_servidor ~* ?', ['^(https?://|/[^/])'])
+            ->where('duracion_segundos', '>', 0)
+            ->when($search !== '', fn ($query) => $query->where('titulo_clip', 'ILIKE', "%{$search}%"))
+            ->orderBy('titulo_clip')->orderBy('id')->limit(100)->get()
+            ->map(fn ($file) => [
+                'id' => 'mam:' . $file->id,
+                'titulo' => $file->titulo_clip,
+                'ruta' => $file->ruta_servidor,
+                'duracion_ms' => $file->duracion_segundos * 1000,
+                'origen' => 'MAM',
+            ]);
+
+        return response()->json($stored->concat($mam)->sortBy('titulo')->take(100)->values());
+    }
+
+    public function getQualityFiles(Request $request)
+    {
+        $data = $request->validate(['q' => 'nullable|string|max:150', 'program_id' => 'nullable|integer']);
+        $usage = ItemParrilla::query()->whereRaw("media_playout->>'file_path' = archivo_parrilla.ruta");
+        $files = ArchivoParrilla::with(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot'])
+            ->when($data['program_id'] ?? null, fn ($query, $id) => $query->where(fn ($group) => $group
+                ->where('id_programa', $id)
+                ->orWhereExists((clone $usage)->where('id_programa', $id)->toBase())))
+            ->when(trim($data['q'] ?? '') !== '', fn ($query) => $query->where('titulo', 'ILIKE', '%' . trim($data['q']) . '%'))
+            ->orderByDesc('id')->limit(100)->get();
+
+        $programsByRoute = ItemParrilla::query()
+            ->leftJoin('programa', 'programa.id', '=', 'item_parrilla.id_programa')
+            ->whereIn(DB::raw("media_playout->>'file_path'"), $files->pluck('ruta'))
+            ->selectRaw("media_playout->>'file_path' AS route, COALESCE(media_playout->>'program_title', programa.titulo) AS title")
+            ->distinct()->get()->groupBy('route');
+
+        return response()->json($files->map(function (ArchivoParrilla $file) use ($programsByRoute) {
+            $titles = $programsByRoute->get($file->ruta, collect())->pluck('title')
+                ->push($file->programa?->titulo)->filter()->unique()->values();
+
+            return $file->toArray() + ['program_titles' => $titles];
+        }));
+    }
+
+    public function analyzeQualityFile(ArchivoParrilla $archivo, MediaQualityCheck $quality)
+    {
+        $result = $quality->inspect($archivo->ruta);
+        DB::transaction(function () use ($archivo, $result) {
+            $archivo->update(['qc' => $result] + ($result['status'] === 'APROBADO_TECNICO'
+                ? ['duracion_ms' => $result['duration_ms']] : []));
+            if ($archivo->id_programa) {
+                MaterialVideo::where('id_programa', $archivo->id_programa)->where('ruta_servidor', $archivo->ruta)
+                    ->whereIn('estado', ['INGESTADO', 'LISTO', 'CUARENTENA'])
+                    ->update($this->mamTechnicalFields($archivo));
+            }
+        });
+
+        return response()->json($archivo->load(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot']));
+    }
+
+    public function storeParrillaFile(Request $request, MediaQualityCheck $quality)
+    {
+        $data = $request->validate([
+            'video' => 'required|file|mimetypes:video/mp4,video/webm,video/ogg|max:512000',
+            'title' => 'required|string|max:255',
+            'duration_ms' => 'nullable|integer|min:1|max:86400000',
+            'program_id' => 'nullable|integer|exists:programa,id',
+        ]);
+        $path = $data['video']->store('parrilla', 'local');
+        abort_unless($path, 500, 'No se pudo guardar el video.');
+
+        try {
+            $route = '/api/parrilla/media/' . basename($path);
+            $result = $quality->inspect($route);
+            $file = DB::transaction(function () use ($request, $data, $route, $result) {
+                $file = ArchivoParrilla::create([
+                    'titulo' => $data['title'],
+                    'ruta' => $route,
+                    'duracion_ms' => $result['status'] === 'APROBADO_TECNICO' ? $result['duration_ms'] : ($data['duration_ms'] ?? 0),
+                    'id_programa' => $data['program_id'] ?? null,
+                    'qc' => $result,
+                ]);
+                if ($file->id_programa) {
+                    MaterialVideo::create([
+                        'id_programa' => $file->id_programa,
+                        'codigo_material' => 'MAM-QC-' . $file->id,
+                        'titulo_clip' => Str::limit($file->titulo, 150, ''),
+                        'ruta_servidor' => $file->ruta,
+                        'id_responsable' => $request->user('sanctum')->getKey(),
+                        'fecha_ingesta' => now(),
+                    ] + $this->mamTechnicalFields($file));
+                }
+
+                return $file;
+            });
+            return response()->json(['id' => 'archivo:' . $file->id, 'origen' => 'Archivos subidos'] + $file->toArray(), 201);
+        } catch (\Throwable $error) {
+            Storage::disk('local')->delete($path);
+            throw $error;
+        }
+    }
+
+    private function mamTechnicalFields(ArchivoParrilla $file): array
+    {
+        $analysis = $file->qc;
+        $video = $analysis['video'] ?? [];
+        return [
+            'formato' => strtoupper(pathinfo($file->ruta, PATHINFO_EXTENSION) . '_' . ($video['codec_name'] ?? 'PENDIENTE')),
+            'resolucion' => isset($video['width'], $video['height']) ? "{$video['width']}x{$video['height']}" : 'PENDIENTE',
+            'duracion_segundos' => (int) round(($analysis['duration_ms'] ?? $file->duracion_ms) / 1000),
+            'estado' => match ($analysis['status']) {
+                'APROBADO_TECNICO' => 'LISTO',
+                'OBSERVADO' => 'CUARENTENA',
+                default => 'INGESTADO',
+            },
+            'observaciones' => implode(' ', $analysis['issues'] ?? []),
+        ];
+    }
+
+    public function addParrillaBlock(Request $request)
+    {
+        $data = $request->validate([
+            'program_title' => 'nullable|string|max:200',
+            'program_id' => 'nullable|integer|exists:programa,id',
+            'scheduled_time' => 'nullable|date_format:H:i',
+            'entries' => 'required|array|min:1|max:100',
+            'entries.*.file_id' => ['required', 'regex:/^(archivo|mam):[1-9][0-9]{0,17}$/'],
+            'entries.*.event_type' => 'required|in:VIDEO,COMMERCIAL',
+        ]);
+
+        $program = isset($data['program_id']) ? Programa::findOrFail($data['program_id']) : null;
+        $title = $program?->titulo ?? $data['program_title'] ?? null;
+        $entries = collect($data['entries']);
+        abort_if($title && !$entries->contains('event_type', 'VIDEO'), 422,
+            'Agrega al menos un segmento de programa.');
+        $stored = ArchivoParrilla::query()
+            ->whereIn('id', $entries->pluck('file_id')->filter(fn ($id) => str_starts_with($id, 'archivo:'))->map(fn ($id) => substr($id, 8)))
+            ->get()->keyBy('id');
+        $mam = MaterialVideo::where('estado', 'LISTO')
+            ->whereIn('id', $entries->pluck('file_id')->filter(fn ($id) => str_starts_with($id, 'mam:'))->map(fn ($id) => substr($id, 4)))
+            ->get()->keyBy('id');
+        $group = $title ? (string) Str::uuid() : null;
+        $items = $entries->values()->map(function (array $entry, int $index) use ($stored, $mam, $title, $group, $data, $program) {
+            [$source, $id] = explode(':', $entry['file_id']);
+            $file = $source === 'archivo' ? $stored->get($id) : $mam->get($id);
+            abort_unless($file, 422, 'Uno de los archivos ya no esta disponible.');
+            abort_if($source === 'archivo' && $file->bloqueadoPorQc(), 422, 'Uno de los archivos necesita aprobar el control técnico.');
+
+            return [
+                'title' => $file->titulo ?? $file->titulo_clip,
+                'file_path' => $file->ruta ?? $file->ruta_servidor,
+                'duration_ms' => $file->duracion_ms ?? ($file->duracion_segundos * 1000),
+                'event_type' => $entry['event_type'],
+                'scheduled_time' => $index === 0 ? ($data['scheduled_time'] ?? null) : null,
+                'group_id' => $group,
+                'program_title' => $title,
+                'program_id' => $program?->id,
+                'timing_mode' => 'AUTO_FOLLOW',
+            ];
+        });
+
+        $request->merge(['items' => $items->all()]);
+        return $this->savePlayoutItems($request, false)->setStatusCode(201);
+    }
+
+    public function uploadPlayoutMedia(Request $request, MediaQualityCheck $quality)
+    {
+        $request->validate(['scheduled_time' => 'nullable|date_format:H:i']);
+        $file = $this->storeParrillaFile($request, $quality)->getData(true);
+        if ($file['qc']['status'] !== 'APROBADO_TECNICO') {
+            return response()->json(['message' => 'El archivo quedó en Control de calidad para revision.', 'qc' => $file['qc']], 422);
+        }
+        $request->merge(['items' => [[
+            'title' => $file['titulo'],
+            'file_path' => $file['ruta'],
+            'duration_ms' => $file['duracion_ms'],
+            'scheduled_time' => $request->input('scheduled_time'),
+            'event_type' => 'VIDEO',
+            'timing_mode' => 'AUTO_FOLLOW',
+        ]]]);
+
+        return $this->savePlayoutItems($request, false)->setStatusCode(201);
+    }
+
+    public function getPlayoutMedia(string $file)
+    {
+        $disk = \Illuminate\Support\Facades\Storage::disk('local');
+        $path = 'parrilla/' . $file;
+        abort_unless($disk->exists($path), 404);
+
+        return response()->file($disk->path($path), [
+            'Content-Type' => $disk->mimeType($path),
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
     public function replacePlayoutPlaylist(Request $request)
     {
-        $itemsData = $request->input('items', []);
-        
-        $hoy = Carbon::today()->toDateString();
-        $parrilla = Parrilla::where('fecha', $hoy)->first();
-        if (!$parrilla) {
-            $parrilla = Parrilla::create([
-                'fecha' => $hoy,
-                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
-                'descripcion' => 'Parrilla de Emisión Playout ' . $hoy,
-                'id_programador' => auth()->id() ?? 1,
-                'estado' => 'APROBADA',
-                'fecha_creacion' => Carbon::now()
-            ]);
-        }
-
-        // Si se enviaron items desde el armador/builder, sincronizar con item_parrilla
-        if (!empty($itemsData)) {
-            // Limpiar items existentes de hoy
-            ItemParrilla::where('id_parrilla', $parrilla->id)->delete();
-
-            $startTime = Carbon::parse('06:00:00');
-            foreach ($itemsData as $it) {
-                $title = $it['title'] ?? 'Clip de Video';
-                $durationMs = (int)($it['duration_ms'] ?? 30000);
-                $durationSec = max(5, round($durationMs / 1000));
-                $filePath = $it['file_path'] ?? ('/mam/storage/' . Str::slug($title) . '.mp4');
-
-                $programa = Programa::where('titulo', $title)->first();
-                if (!$programa) {
-                    $code = 'PRG-' . strtoupper(Str::random(5));
-                    $programa = Programa::create([
-                        'codigo' => $code,
-                        'titulo' => $title,
-                        'descripcion' => 'Material sincronizado desde Escaleta CU3',
-                        'id_categoria' => 1,
-                        'clasificacion_edad' => 'ATP',
-                        'duracion_estandar_minutos' => max(1, round($durationSec / 60)),
-                        'origen' => 'NACIONAL',
-                        'estado' => 'ACTIVO',
-                        'fecha_registro' => Carbon::now()
-                    ]);
-                }
-
-                $endTime = $startTime->copy()->addSeconds($durationSec);
-                ItemParrilla::create([
-                    'id_parrilla' => $parrilla->id,
-                    'id_programa' => $programa->id,
-                    'hora_inicio' => $startTime->format('H:i:s'),
-                    'hora_fin' => $endTime->format('H:i:s'),
-                    'tipo_emision' => ($it['event_type'] ?? '') === 'COMMERCIAL' ? 'GRABADO' : 'VIVO',
-                    'estado' => 'PROGRAMADO',
-                    'observaciones' => 'Sincronizado desde Armador de Parrilla'
-                ]);
-
-                $startTime = $endTime;
-            }
-        }
-
-        return response()->json(['success' => true, 'message' => 'Escaleta sincronizada con la Parrilla de hoy (CU3)']);
+        return $this->savePlayoutItems($request, true);
     }
 
     public function addPlayoutItem(Request $request)
     {
-        $itemsData = $request->input('items', []);
-        if (empty($itemsData) && $request->has('item')) {
-            $itemsData = [$request->input('item')];
+        if (!$request->has('items') && $request->has('item')) {
+            $request->merge(['items' => [$request->input('item')]]);
         }
-
-        if (empty($itemsData)) {
-            return response()->json(['success' => false, 'message' => 'No se enviaron items'], 422);
-        }
-
-        // Obtener o crear parrilla de hoy
-        $hoy = Carbon::today()->toDateString();
-        $parrilla = Parrilla::where('fecha', $hoy)->first();
-        if (!$parrilla) {
-            $parrilla = Parrilla::create([
-                'fecha' => $hoy,
-                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
-                'descripcion' => 'Parrilla de Emisión Playout ' . $hoy,
-                'id_programador' => auth()->id() ?? 1,
-                'estado' => 'APROBADA',
-                'fecha_creacion' => Carbon::now()
-            ]);
-        }
-
-        $created = [];
-        $lastItem = ItemParrilla::where('id_parrilla', $parrilla->id)->orderBy('hora_fin', 'desc')->first();
-        $startTime = $lastItem ? Carbon::parse($lastItem->hora_fin) : Carbon::parse('06:00:00');
-
-        foreach ($itemsData as $it) {
-            $title = $it['title'] ?? 'Clip de Video';
-            $durationMs = (int)($it['duration_ms'] ?? 30000);
-            $durationSec = max(5, round($durationMs / 1000));
-            $filePath = $it['file_path'] ?? ('/mam/storage/' . Str::slug($title) . '.mp4');
-
-            // 1. Buscar o registrar programa para el clip
-            $programa = Programa::where('titulo', $title)->first();
-            if (!$programa) {
-                $code = 'CLIP-' . strtoupper(Str::random(5));
-                $programa = Programa::create([
-                    'codigo' => $code,
-                    'titulo' => $title,
-                    'descripcion' => 'Material agregado desde consola Playout',
-                    'id_categoria' => 1,
-                    'clasificacion_edad' => 'ATP',
-                    'duracion_estandar_minutos' => max(1, round($durationSec / 60)),
-                    'origen' => 'NACIONAL',
-                    'estado' => 'ACTIVO',
-                    'fecha_registro' => Carbon::now()
-                ]);
-            }
-
-            // 2. Registrar el material de video en MAM
-            $material = MaterialVideo::create([
-                'id_programa' => $programa->id,
-                'codigo_material' => 'MAT-' . strtoupper(Str::random(6)),
-                'titulo_clip' => $title,
-                'formato' => 'HD_1080I',
-                'resolucion' => '1920x1080',
-                'duracion_segundos' => $durationSec,
-                'ruta_servidor' => $filePath,
-                'estado' => 'LISTO',
-                'id_responsable' => auth()->id() ?? 1,
-                'fecha_ingesta' => Carbon::now(),
-                'observaciones' => 'Ingesta directa desde Playout Deck'
-            ]);
-
-            // 3. Crear el bloque en item_parrilla
-            $endTime = $startTime->copy()->addSeconds($durationSec);
-            $itemParrilla = ItemParrilla::create([
-                'id_parrilla' => $parrilla->id,
-                'id_programa' => $programa->id,
-                'hora_inicio' => $startTime->format('H:i:s'),
-                'hora_fin' => $endTime->format('H:i:s'),
-                'tipo_emision' => 'GRABADO',
-                'estado' => 'PROGRAMADO',
-                'observaciones' => 'Cargado a escaleta al aire'
-            ]);
-
-            $created[] = [
-                'id' => $itemParrilla->id,
-                'title' => $title,
-                'file_path' => $filePath,
-                'duration_ms' => $durationMs,
-                'status' => 'READY'
-            ];
-
-            $startTime = $endTime;
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => count($created) . ' video(s) agregados y guardados en base de datos PostgreSQL',
-            'items' => $created
-        ]);
+        return $this->savePlayoutItems($request, false);
     }
 
-    public function deletePlayoutItem($id)
+    private function savePlayoutItems(Request $request, bool $replace)
     {
-        ItemParrilla::where('id', $id)->delete();
+        $data = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.title' => 'required|string|max:255',
+            'items.*.file_path' => ['required', 'string', 'max:2048', 'regex:~^(?:https?://|/(?!/))~i'],
+            'items.*.duration_ms' => 'required|integer|min:1|max:86400000',
+            'items.*.event_type' => 'nullable|in:VIDEO,COMMERCIAL',
+            'items.*.timing_mode' => 'nullable|in:AUTO_FOLLOW,HARD_START,MANUAL',
+            'items.*.scheduled_time' => 'nullable|date_format:H:i',
+            'items.*.group_id' => 'nullable|uuid',
+            'items.*.program_title' => 'nullable|string|max:200',
+            'items.*.program_id' => 'nullable|integer|exists:programa,id',
+            'items.*.in_point_ms' => 'nullable|integer|min:0',
+            'items.*.out_point_ms' => 'nullable|integer|min:0',
+        ]);
+
+        $created = DB::transaction(function () use ($data, $request, $replace) {
+            // Serializa la creaci?n de la parrilla diaria y el c?lculo del siguiente horario.
+            DB::statement('LOCK TABLE parrilla IN SHARE ROW EXCLUSIVE MODE');
+            $parrilla = $this->parrillaDeHoy()->first() ?? Parrilla::create([
+                'fecha' => Carbon::today('America/La_Paz')->toDateString(),
+                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
+                'descripcion' => 'Parrilla de hoy',
+                'id_programador' => $request->user('sanctum')?->getKey() ?? Usuario::query()->orderBy('id_usuario')->value('id_usuario'),
+                'estado' => 'BORRADOR',
+                'fecha_creacion' => Carbon::now('America/La_Paz'),
+            ]);
+
+            if ($replace) {
+                $this->deleteParrillaItems($parrilla);
+            }
+
+            $last = $parrilla->items()->reorder('hora_inicio', 'desc')->orderByDesc('id')->first();
+            $start = Carbon::parse($last?->hora_fin ?? '06:00:00', 'America/La_Paz');
+
+            return collect($data['items'])->map(function (array $media) use ($parrilla, &$start) {
+                if (!empty($media['scheduled_time'])) {
+                    $scheduled = Carbon::parse($media['scheduled_time'], 'America/La_Paz');
+                    abort_if($scheduled->lt($start) && ($parrilla->items()->exists()), 422,
+                        'El horario elegido se cruza con los bloques existentes.');
+                    $start = $scheduled;
+                }
+
+                $duration = (int) ceil($media['duration_ms'] / 1000);
+                $end = $start->copy()->addSeconds($duration);
+                abort_if(!$start->isSameDay($end), 422, 'La parrilla supera la medianoche.');
+
+                $item = $parrilla->items()->create([
+                    'id_programa' => $media['program_id'] ?? null,
+                    'hora_inicio' => $start->format('H:i:s'),
+                    'hora_fin' => $end->format('H:i:s'),
+                    'tipo_emision' => 'GRABADO',
+                    'estado' => 'PROGRAMADO',
+                    'media_playout' => $media,
+                ]);
+
+                $start = $end;
+                return ['id' => $item->id] + $media;
+            });
+        });
+
+        return response()->json(['success' => true, 'items' => $created]);
+    }
+
+    private function deleteParrillaItems(Parrilla $parrilla, ?int $id = null): void
+    {
+        $items = $parrilla->items()->when($id !== null, fn ($query) => $query->whereKey($id));
+        abort_if((clone $items)->where(fn ($query) => $query
+            ->has('validaciones')->orHas('pautas')->orHas('emisionesReales'))->exists(), 409,
+            'La selecci?n contiene bloques vinculados con Control de calidad, Pautas o Bit?cora.');
+        $items->delete();
+    }
+
+    public function deletePlayoutItem(int $id)
+    {
+        $parrilla = $this->parrillaDeHoy()->firstOrFail();
+        $this->deleteParrillaItems($parrilla, $id);
+
         return response()->json(['success' => true]);
     }
 
     public function clearPlayoutPlaylist()
     {
-        $hoy = Carbon::today()->toDateString();
-        $parrilla = Parrilla::where('fecha', $hoy)->first();
-        if ($parrilla) {
-            ItemParrilla::where('id_parrilla', $parrilla->id)->delete();
+        if ($parrilla = $this->parrillaDeHoy()->first()) {
+            $this->deleteParrillaItems($parrilla);
         }
+
         return response()->json(['success' => true]);
+    }
+
+    public function recordPlayoutCompletion(Request $request)
+    {
+        $data = $request->validate([
+            'item_id' => 'required_without:pauta_id|prohibits:pauta_id|integer|min:1',
+            'pauta_id' => 'required_without:item_id|prohibits:item_id|integer|min:1',
+            'started_at' => 'required|date|before_or_equal:now',
+            'duration_ms' => 'required|integer|min:0|max:86400000',
+        ]);
+
+        DB::transaction(function () use ($request, $data) {
+            $pauta = isset($data['pauta_id'])
+                ? PautaComercial::with('spot.archivo')->lockForUpdate()->findOrFail($data['pauta_id'])
+                : null;
+            $item = ItemParrilla::query()->lockForUpdate()->findOrFail($pauta?->id_item_parrilla ?? $data['item_id']);
+            if (($pauta?->estado ?? $item->estado) === 'EMITIDO') {
+                return;
+            }
+            abort_if($item->estado === 'CANCELADO' || ($pauta && $pauta->estado !== 'PAUTADO'), 409, 'El evento fue cancelado.');
+            $seconds = (int) round($data['duration_ms'] / 1000);
+            $planned = $pauta
+                ? ($pauta->spot->archivo?->duracion_ms ?? $pauta->spot->duracion_segundos * 1000)
+                : ($item->media_playout['duration_ms'] ?? null);
+            $start = Carbon::parse($data['started_at'])->setTimezone('America/La_Paz');
+            $end = Carbon::now('America/La_Paz');
+
+            $item->emisionesReales()->create([
+                'id_pauta_comercial' => $pauta?->id,
+                'hora_inicio_real' => $start,
+                'hora_fin_real' => $end,
+                'duracion_real_segundos' => $seconds,
+                'discrepancia_segundos' => $planned ? $seconds - (int) round($planned / 1000) : 0,
+                'estado_emision' => 'EMITIDO_CORRECTO',
+                'operador_emision' => $request->user()->nombre,
+                'observaciones' => 'Reproduccion completada en el monitor web',
+                'fecha_registro' => $end,
+            ]);
+            ($pauta ?? $item)->update(['estado' => 'EMITIDO']);
+        });
+
+        return response()->json(['success' => true]);
+    }
+
+    private function auditQuery(Request $request)
+    {
+        $filters = $request->validate([
+            'startDate' => 'nullable|date_format:Y-m-d',
+            'endDate' => 'nullable|date_format:Y-m-d',
+            'search' => 'nullable|string|max:150',
+            'status' => 'nullable|string|max:40',
+        ]);
+        $query = EmisionRealLog::with(['itemParrilla.programa', 'materialVideo', 'pauta.spot.archivo']);
+
+        if ($start = $filters['startDate'] ?? null) {
+            $query->where('hora_inicio_real', '>=', $start . ' 00:00:00');
+        }
+        if ($end = $filters['endDate'] ?? null) {
+            $query->where('hora_inicio_real', '<', Carbon::parse($end, 'America/La_Paz')->addDay()->toDateString() . ' 00:00:00');
+        }
+        if ($search = trim($filters['search'] ?? '')) {
+            $term = "%{$search}%";
+            $query->where(function ($query) use ($term) {
+                $query->whereHas('itemParrilla', fn ($items) => $items
+                    ->whereRaw("media_playout->>'title' ILIKE ?", [$term])
+                    ->orWhereRaw("media_playout->>'program_title' ILIKE ?", [$term])
+                    ->orWhereRaw("media_playout->>'file_path' ILIKE ?", [$term])
+                    ->orWhereHas('programa', fn ($programs) => $programs->where('titulo', 'ILIKE', $term)))
+                    ->orWhereHas('materialVideo', fn ($material) => $material->where('ruta_servidor', 'ILIKE', $term))
+                    ->orWhereHas('pauta.spot', fn ($spots) => $spots
+                        ->where('titulo_spot', 'ILIKE', $term)
+                        ->orWhereHas('archivo', fn ($files) => $files->where('ruta', 'ILIKE', $term)))
+                    ->orWhere('operador_emision', 'ILIKE', $term);
+            });
+        }
+        if (($status = $filters['status'] ?? null) && $status !== 'ALL') {
+            $states = match ($status) {
+                'PLAYED_SUCCESS' => ['EMITIDO_CORRECTO'],
+                'FILE_CORRUPT_OR_MISSING' => ['FALLA_TECNICA', 'NO_EMITIDO'],
+                'INTERRUPTED' => ['CORTE_ENERGIA', 'INTERRUPCION_NOTICIOSA'],
+                default => [$status],
+            };
+            $query->whereIn('estado_emision', $states);
+        }
+
+        return $query->orderByDesc('hora_inicio_real')->orderByDesc('id');
+    }
+
+    private function auditEntry(EmisionRealLog $em): array
+    {
+        $item = $em->itemParrilla;
+        $media = $item?->media_playout ?? [];
+        $spot = $em->pauta?->spot;
+        $status = $em->estado_emision;
+
+        return [
+            'id' => $em->id,
+            'item_id' => $em->id_item_parrilla,
+            'pauta_id' => $em->id_pauta_comercial,
+            'title' => $spot?->titulo_spot ?? $media['title'] ?? $item?->programa?->titulo ?? 'Emisión en continuidad',
+            'program_title' => $media['program_title'] ?? $item?->programa?->titulo,
+            'file_path' => $spot ? $spot->archivo?->ruta : ($media['file_path'] ?? $em->materialVideo?->ruta_servidor),
+            'event_type' => $spot ? 'COMMERCIAL' : ($media['event_type'] ?? 'VIDEO'),
+            'planned_start' => $em->pauta ? $em->pauta->hora_estimada : $item?->hora_inicio,
+            'started_at' => $em->hora_inicio_real ? Carbon::parse($em->hora_inicio_real, 'America/La_Paz')->toIso8601String() : null,
+            'ended_at' => $em->hora_fin_real ? Carbon::parse($em->hora_fin_real, 'America/La_Paz')->toIso8601String() : null,
+            'planned_duration_ms' => ($em->duracion_real_segundos - $em->discrepancia_segundos) * 1000,
+            'actual_duration_ms' => $em->duracion_real_segundos * 1000,
+            'discrepancy_ms' => $em->discrepancia_segundos * 1000,
+            'broadcast_status' => $status,
+            'status' => $status === 'EMITIDO_CORRECTO' ? 'SUCCESS' : ($status === 'NO_EMITIDO' ? 'SKIPPED' : 'ERROR'),
+            'operator' => $em->operador_emision,
+            'notes' => $em->observaciones,
+        ];
     }
 
     public function getAuditLogs(Request $request)
     {
-        $limit = $request->input('limit', 50);
-        $offset = $request->input('offset', 0);
-        $search = $request->input('search');
-        $status = $request->input('status');
-
-        $query = EmisionRealLog::with(['itemParrilla.programa', 'materialVideo']);
-
-        if ($search) {
-            $query->whereHas('itemParrilla.programa', function ($q) use ($search) {
-                $q->where('titulo', 'ILIKE', "%{$search}%");
-            })->orWhere('operador_emision', 'ILIKE', "%{$search}%");
-        }
-
-        if ($status && $status !== 'ALL') {
-            $query->where('estado_emision', $status);
-        }
-
-        $total = $query->count();
-        $emisiones = $query->orderBy('hora_inicio_real', 'desc')->offset($offset)->limit($limit)->get();
-
-        $logs = [];
-        foreach ($emisiones as $em) {
-            $logs[] = [
-                'id' => $em->id,
-                'title' => $em->itemParrilla && $em->itemParrilla->programa ? $em->itemParrilla->programa->titulo : 'Emisión en Continuidad',
-                'file_path' => $em->materialVideo ? $em->materialVideo->ruta_servidor : '/videos/master.mp4',
-                'event_type' => 'VIDEO',
-                'started_at' => $em->hora_inicio_real,
-                'ended_at' => $em->hora_fin_real,
-                'planned_duration_ms' => ($em->duracion_real_segundos - $em->discrepancia_segundos) * 1000,
-                'actual_duration_ms' => $em->duracion_real_segundos * 1000,
-                'discrepancy_ms' => $em->discrepancia_segundos * 1000,
-                'status' => $em->estado_emision === 'EMITIDO_CORRECTO' ? 'SUCCESS' : ($em->estado_emision === 'CANCELADO' ? 'SKIPPED' : 'ERROR'),
-                'operator' => $em->operador_emision,
-                'notes' => $em->observaciones
-            ];
-        }
-
-        return response()->json([
-            'logs' => $logs,
-            'total' => $total
+        $page = $request->validate([
+            'limit' => 'nullable|integer|min:1|max:250',
+            'offset' => 'nullable|integer|min:0',
         ]);
+        $query = $this->auditQuery($request);
+        return response()->json([
+            'total' => (clone $query)->reorder()->count(),
+            'logs' => $query->offset($page['offset'] ?? 0)->limit($page['limit'] ?? 50)->get()
+                ->map(fn (EmisionRealLog $entry) => $this->auditEntry($entry)),
+        ]);
+    }
+
+    public function exportAuditCsv(Request $request)
+    {
+        $query = $this->auditQuery($request);
+        return response()->streamDownload(function () use ($query) {
+            $stream = fopen('php://output', 'w');
+            fwrite($stream, "\xEF\xBB\xBF");
+            fputcsv($stream, ['ID', 'Contenido', 'Programa', 'Tipo', 'Archivo', 'Inicio previsto', 'Inicio real', 'Fin real', 'Previsto (ms)', 'Real (ms)', 'Diferencia (ms)', 'Estado', 'Operador', 'Observaciones'], ',', '"', '');
+            foreach ($query->lazy(250) as $emision) {
+                $entry = $this->auditEntry($emision);
+                $values = [$entry['id'], $entry['title'], $entry['program_title'], $entry['event_type'], $entry['file_path'],
+                    $entry['planned_start'], $entry['started_at'], $entry['ended_at'], $entry['planned_duration_ms'],
+                    $entry['actual_duration_ms'], $entry['discrepancy_ms'], $entry['broadcast_status'], $entry['operator'], $entry['notes']];
+                fputcsv($stream, array_map(fn ($value) => is_string($value) && preg_match('/^[\s]*[=+@-]/u', $value)
+                    ? "'" . $value : $value, $values), ',', '"', '');
+            }
+            fclose($stream);
+        }, 'as-run.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
     }
 
     public function getAuditStats()
     {
-        $totalEmisiones = EmisionRealLog::count();
-        $correctas = EmisionRealLog::where('estado_emision', 'EMITIDO_CORRECTO')->count();
-        $fallidas = EmisionRealLog::where('estado_emision', 'FALLIDO')->count();
+        $today = Carbon::today('America/La_Paz');
+        $stats = EmisionRealLog::query()->selectRaw(
+            "COUNT(*) AS total, COUNT(*) FILTER (WHERE estado_emision = 'EMITIDO_CORRECTO') AS correct,
+             COUNT(*) FILTER (WHERE estado_emision IN ('FALLA_TECNICA', 'CORTE_ENERGIA', 'INTERRUPCION_NOTICIOSA', 'NO_EMITIDO')) AS failures,
+             COUNT(*) FILTER (WHERE hora_inicio_real >= ? AND hora_inicio_real < ?) AS today,
+             COALESCE(SUM(duracion_real_segundos), 0) AS seconds",
+            [$today->toDateTimeString(), $today->copy()->addDay()->toDateTimeString()]
+        )->first();
 
-        return response()->json([
-            'stats' => [
-                'total_broadcasts' => $totalEmisiones,
-                'successful_broadcasts' => $correctas,
-                'failed_broadcasts' => $fallidas,
-                'total_duration_hours' => round(EmisionRealLog::sum('duracion_real_segundos') / 3600, 2),
-                'uptime_percentage' => $totalEmisiones > 0 ? round(($correctas / $totalEmisiones) * 100, 1) : 100
-            ]
-        ]);
+        return response()->json(['stats' => [
+            'total_broadcasts' => (int) $stats->total,
+            'today_broadcasts' => (int) $stats->today,
+            'successful_broadcasts' => (int) $stats->correct,
+            'failed_broadcasts' => (int) $stats->failures,
+            'total_duration_hours' => round($stats->seconds / 3600, 2),
+            'uptime_percentage' => $stats->total ? round($stats->correct / $stats->total * 100, 1) : null,
+        ]]);
     }
 
     public function getIncidents()
     {
         $incidentes = ValidacionEmision::with(['itemParrilla.programa', 'inspector'])
-            ->where('resultado_qc', 'RECHAZADO')
+            ->whereIn('resultado_qc', ['OBSERVADO', 'RECHAZADO_FALLA_AUDIO', 'RECHAZADO_FALLA_VIDEO', 'RECHAZADO_SIN_MATERIAL'])
             ->orderBy('id', 'desc')
             ->limit(30)
             ->get();
@@ -968,7 +1265,7 @@ class PlayoutBmsController extends Controller
             $list[] = [
                 'id' => $inc->id,
                 'item_id' => $inc->id_item_parrilla,
-                'title' => $inc->itemParrilla && $inc->itemParrilla->programa ? $inc->itemParrilla->programa->titulo : 'Rechazo QC',
+                'title' => $inc->itemParrilla?->media_playout['title'] ?? $inc->itemParrilla?->programa?->titulo ?? 'Rechazo QC',
                 'incident_type' => 'QC_REJECT',
                 'severity' => 'WARNING',
                 'details' => $inc->observaciones . ' (Audio: ' . $inc->nivel_audio_db . ' dB, Aspect: ' . $inc->aspect_ratio . ')',
@@ -984,6 +1281,6 @@ class PlayoutBmsController extends Controller
 
     public function playoutCommand(Request $request, $action)
     {
-        return response()->json(['success' => true, 'action' => $action]);
+        return response()->json(['message' => 'El transporte se controla desde el reproductor web.'], 501);
     }
 }

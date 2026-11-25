@@ -1,16 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type ThemeMode = 'dark' | 'light';
-export type ColorPalette = 'default' | 'broadcast-blue' | 'cyber-emerald' | 'sunset-amber';
-export type FontSizeLevel = 'sm' | 'md' | 'lg';
+type ThemeMode = 'dark' | 'light' | 'auto';
+type VisualProfile = 'child' | 'youth' | 'adult';
+type FontSizeLevel = 'sm' | 'md' | 'lg' | 'xl';
 
 interface VisualPreferences {
   themeMode: ThemeMode;
-  colorPalette: ColorPalette;
+  profile: VisualProfile;
   fontSize: FontSizeLevel;
+  highContrast: boolean;
+  darkFrom: string;
+  darkUntil: string;
 }
 
-interface UserSession {
+export interface UserSession {
   id_usuario: number;
   nombre: string;
   apellidos: string;
@@ -18,66 +21,95 @@ interface UserSession {
   usuario_sistema: string;
   ci: string;
   roles: string[];
-  rol_principal: 'ADMINISTRADOR' | 'PROGRAMADOR' | 'ENCARGADO_CONTENIDOS' | string;
-}
-
-interface PreferencesContextType {
-  prefs: VisualPreferences;
-  user: UserSession | null;
-  setUser: (u: UserSession | null) => void;
-  setThemeMode: (mode: ThemeMode) => void;
-  setColorPalette: (palette: ColorPalette) => void;
-  setFontSize: (size: FontSizeLevel) => void;
-  logout: () => void;
+  rol_principal: string;
 }
 
 const defaultPrefs: VisualPreferences = {
   themeMode: 'dark',
-  colorPalette: 'default',
-  fontSize: 'md'
+  profile: 'adult',
+  fontSize: 'md',
+  highContrast: false,
+  darkFrom: '19:00',
+  darkUntil: '07:00',
 };
 
-const PreferencesContext = createContext<PreferencesContextType>({
+const clock = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'America/La_Paz', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+});
+const validTime = (value: unknown): value is string =>
+  typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+function readPreferences(): VisualPreferences {
+  try {
+    const saved = JSON.parse(localStorage.getItem('canal11_visual_prefs') ?? 'null');
+    if (!saved) return defaultPrefs;
+    const profile = ['child', 'youth', 'adult'].includes(saved.profile)
+      ? saved.profile
+      : saved.colorPalette === 'sunset-amber' ? 'child' : saved.colorPalette === 'cyber-emerald' ? 'youth' : 'adult';
+    return {
+      profile,
+      themeMode: ['light', 'dark', 'auto'].includes(saved.themeMode) ? saved.themeMode : defaultPrefs.themeMode,
+      fontSize: ['sm', 'md', 'lg', 'xl'].includes(saved.fontSize) ? saved.fontSize : defaultPrefs.fontSize,
+      highContrast: saved.highContrast === true,
+      darkFrom: validTime(saved.darkFrom) ? saved.darkFrom : defaultPrefs.darkFrom,
+      darkUntil: validTime(saved.darkUntil) ? saved.darkUntil : defaultPrefs.darkUntil,
+    };
+  } catch {
+    return defaultPrefs;
+  }
+}
+
+function effectiveTheme({ themeMode, darkFrom, darkUntil }: VisualPreferences) {
+  if (themeMode !== 'auto') return themeMode;
+  const now = clock.format(new Date());
+  const dark = darkFrom === darkUntil || (darkFrom < darkUntil
+    ? now >= darkFrom && now < darkUntil
+    : now >= darkFrom || now < darkUntil);
+  return dark ? 'dark' : 'light';
+}
+
+const PreferencesContext = createContext({
   prefs: defaultPrefs,
-  user: null,
-  setUser: () => {},
-  setThemeMode: () => {},
-  setColorPalette: () => {},
-  setFontSize: () => {},
-  logout: () => {}
+  user: null as UserSession | null,
+  setUser: (_user: UserSession | null) => {},
+  updatePreferences: (_changes: Partial<VisualPreferences>) => {},
+  logout: () => {},
 });
 
 export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [prefs, setPrefs] = useState<VisualPreferences>(() => {
-    try {
-      const saved = localStorage.getItem('canal11_visual_prefs');
-      return saved ? JSON.parse(saved) : defaultPrefs;
-    } catch {
-      return defaultPrefs;
-    }
-  });
-
+  const [prefs, setPrefs] = useState(readPreferences);
   const [user, setUser] = useState<UserSession | null>(() => {
     try {
-      const saved = localStorage.getItem('playout_user');
-      return saved ? JSON.parse(saved) : null;
+      return JSON.parse(localStorage.getItem('playout_user') ?? 'null');
     } catch {
       return null;
     }
   });
 
   useEffect(() => {
-    // Aplicar a HTML raíz para herencia en cascada CSS limpia
     const root = document.documentElement;
-    root.setAttribute('data-theme', prefs.themeMode);
-    root.setAttribute('data-palette', prefs.colorPalette);
-    root.setAttribute('data-font-size', prefs.fontSize);
-    localStorage.setItem('canal11_visual_prefs', JSON.stringify(prefs));
+    const refreshTheme = () => { root.dataset.theme = effectiveTheme(prefs); };
+    root.dataset.profile = prefs.profile;
+    root.dataset.fontSize = prefs.fontSize;
+    root.dataset.contrast = prefs.highContrast ? 'high' : 'standard';
+    refreshTheme();
+    try {
+      localStorage.setItem('canal11_visual_prefs', JSON.stringify(prefs));
+    } catch {
+      // Session preferences still apply when persistent storage is unavailable.
+    }
+    if (prefs.themeMode !== 'auto') return;
+    const timer = window.setInterval(refreshTheme, 1000);
+    document.addEventListener('visibilitychange', refreshTheme);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshTheme);
+    };
   }, [prefs]);
 
-  const setThemeMode = (mode: ThemeMode) => setPrefs(prev => ({ ...prev, themeMode: mode }));
-  const setColorPalette = (palette: ColorPalette) => setPrefs(prev => ({ ...prev, colorPalette: palette }));
-  const setFontSize = (fontSize: FontSizeLevel) => setPrefs(prev => ({ ...prev, fontSize }));
+  const updatePreferences = (changes: Partial<VisualPreferences>) => {
+    setPrefs(previous => ({ ...previous, ...changes }));
+  };
 
   const logout = () => {
     localStorage.removeItem('playout_token');
@@ -86,7 +118,7 @@ export const PreferencesProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   return (
-    <PreferencesContext.Provider value={{ prefs, user, setUser, setThemeMode, setColorPalette, setFontSize, logout }}>
+    <PreferencesContext.Provider value={{ prefs, user, setUser, updatePreferences, logout }}>
       {children}
     </PreferencesContext.Provider>
   );

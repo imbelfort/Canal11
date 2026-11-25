@@ -428,7 +428,56 @@ export const ProgramadorView: React.FC = () => {
         {activeSubTab === 'spots' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Alta de Spot Publicitario y Vinculacion (CU6)</h3>
+              <h3 className="bms-card-title">Alta de Spot Publicitario con Subida de Archivo (CU6)</h3>
+              <p className="bms-text-muted">
+                Seleccione el archivo de video del comercial. La duración se auto-detecta y se vincula automáticamente en base de datos al cliente seleccionado.
+              </p>
+
+              {/* Zona de exploracion de archivos para Spot */}
+              <div
+                style={{
+                  border: '2px dashed var(--color-hairline, #334155)',
+                  borderRadius: 12,
+                  padding: 18,
+                  textAlign: 'center',
+                  background: 'var(--color-field, #0f172a)',
+                  marginBottom: 16,
+                  cursor: 'pointer'
+                }}
+                onClick={() => document.getElementById('spot-file-input')?.click()}
+              >
+                <Film size={28} color="var(--primary, #38bdf8)" style={{ margin: '0 auto 6px' }} />
+                <div style={{ fontWeight: 600, fontSize: 13.5 }}>Haga clic aquí para seleccionar el archivo de video del Spot</div>
+                <div style={{ fontSize: 11.5, color: '#94a3b8' }}>Formatos: MP4, MOV, MKV, MXF, TS</div>
+                <input
+                  id="spot-file-input"
+                  type="file"
+                  accept="video/*,.mxf,.ts,.mp4,.mov"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const baseName = file.name.replace(/\.[^/.]+$/, '');
+                    const titleInput = document.getElementById('spot-titulo-input') as HTMLInputElement;
+                    const durInput = document.getElementById('spot-duracion-input') as HTMLInputElement;
+                    if (titleInput) titleInput.value = baseName;
+
+                    try {
+                      const url = URL.createObjectURL(file);
+                      const v = document.createElement('video');
+                      v.preload = 'metadata';
+                      v.onloadedmetadata = () => {
+                        URL.revokeObjectURL(url);
+                        if (durInput) durInput.value = String(Math.round(v.duration) || 30);
+                      };
+                      v.src = url;
+                    } catch {
+                      if (durInput) durInput.value = '30';
+                    }
+                  }}
+                />
+              </div>
+
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -440,7 +489,7 @@ export const ProgramadorView: React.FC = () => {
                   };
                   const res = await bmsApi.createSpot(body);
                   if (res.success || res.spot) {
-                    alert('Spot publicitario registrado y vinculado al cliente.');
+                    alert('Spot publicitario registrado y vinculado al cliente en BD.');
                     form.reset();
                     loadData();
                   }
@@ -457,16 +506,16 @@ export const ProgramadorView: React.FC = () => {
                   </div>
                   <div className="bms-form-group">
                     <label>Titulo del Comercial / Campaña</label>
-                    <input name="titulo" required placeholder="Promocion Fin de Año 2026" />
+                    <input id="spot-titulo-input" name="titulo" required placeholder="Promocion Fin de Año 2026" />
                   </div>
                   <div className="bms-form-group">
-                    <label>Duracion en Segundos</label>
-                    <input name="duracion" type="number" required defaultValue="30" />
+                    <label>Duracion en Segundos (Auto-detectada)</label>
+                    <input id="spot-duracion-input" name="duracion" type="number" required defaultValue="30" />
                   </div>
                 </div>
                 <button type="submit" className="bms-btn-primary">
                   <Plus size={14} />
-                  <span>Guardar Spot Comercial</span>
+                  <span>Guardar Spot Comercial en BD</span>
                 </button>
               </form>
             </div>

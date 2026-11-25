@@ -34,6 +34,8 @@ interface BuilderToolbarProps {
   onOpenPlaylistFile: () => void;
   onSavePlaylist: () => void;
   onClearAll: () => void;
+  onLoadFromBmsParrilla?: () => void;
+  onSaveToBmsParrilla?: () => void;
 }
 
 export const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
@@ -56,7 +58,9 @@ export const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   hasItems,
   onOpenPlaylistFile,
   onSavePlaylist,
-  onClearAll
+  onClearAll,
+  onLoadFromBmsParrilla,
+  onSaveToBmsParrilla
 }) => {
   return (
     <div style={{
@@ -211,6 +215,33 @@ export const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               <span>Eliminar ({selectedCount})</span>
             </button>
           </div>
+        )}
+
+        {onLoadFromBmsParrilla && (
+          <button
+            type="button"
+            className="btn-tool"
+            onClick={onLoadFromBmsParrilla}
+            style={{ fontSize: 11, padding: '5px 12px', gap: 6, color: 'var(--color-primary)' }}
+            title="Cargar la escaleta del día desde la Parrilla de Programación (CU3)"
+          >
+            <RefreshCw size={12} />
+            <span>Cargar de Parrilla CU3</span>
+          </button>
+        )}
+
+        {onSaveToBmsParrilla && (
+          <button
+            type="button"
+            className="btn-tool"
+            onClick={onSaveToBmsParrilla}
+            disabled={isSendingToDeck || !hasItems}
+            style={{ fontSize: 11, padding: '5px 12px', gap: 6, color: 'var(--color-success)' }}
+            title="Guardar y sincronizar esta escaleta armada directamente con la Parrilla de hoy (CU3)"
+          >
+            <Download size={12} />
+            <span>Guardar en Parrilla CU3</span>
+          </button>
         )}
 
         <button

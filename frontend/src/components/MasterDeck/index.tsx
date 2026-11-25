@@ -161,7 +161,6 @@ export const MasterDeck: React.FC<MasterDeckProps> = ({
           isMuted={isMuted}
           volume={isMuted ? 0 : monitorVolume}
           onToggleMute={handleToggleMute}
-          onOpenAudioModal={handleOpenAudioModal}
           onAudioLevelsChange={handleAudioLevelsChange}
         />
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../../services/api';
+import { bmsApi } from '../../services/bmsApi';
 import { AddPlaylistItemDto } from '../../types/playout';
 import { getMediaDuration, isCommercialMedia } from './PlaylistToolbar';
 import { NetworkModal } from '../Network/NetworkModal';
@@ -767,6 +768,59 @@ export const PlaylistBuilderView: React.FC<PlaylistBuilderViewProps> = ({
     }
   };
 
+  // Cargar bloques de la Parrilla del Día (CU3)
+  const handleLoadFromBmsParrilla = async () => {
+    try {
+      const parrilla = await bmsApi.getParrillaHoy();
+      if (!parrilla || !parrilla.items || parrilla.items.length === 0) {
+        setNotification({ message: 'No hay bloques configurados en la parrilla oficial de hoy', type: 'error' });
+        return;
+      }
+
+      const imported: BuilderItem[] = parrilla.items.map((it: any, idx: number) => {
+        const mat = it.programa?.materiales?.[0];
+        const durSec = mat?.duracion_segundos || (it.programa?.duracion_estandar_minutos ? it.programa.duracion_estandar_minutos * 60 : 1800);
+        return {
+          id: `parrilla-item-${it.id_item_parrilla || idx}-${Date.now()}`,
+          title: it.programa ? `${it.programa.codigo} - ${it.programa.titulo}` : `Bloque ${it.hora_inicio}`,
+          file_path: mat?.ruta_servidor || `/mam/storage/${it.programa?.codigo || 'clip'}.mp4`,
+          event_type: it.tipo_emision === 'VIVO' ? 'LIVE_SDI' : 'VIDEO',
+          duration_ms: durSec * 1000,
+          in_point_ms: 0,
+          out_point_ms: 0,
+          show_graphics: true,
+          timing_mode: 'AUTO_FOLLOW',
+          scheduled_time: it.hora_inicio
+        };
+      });
+
+      setItems(imported);
+      setSelectedIds(new Set());
+      setNotification({ message: `${imported.length} bloques cargados exitosamente desde la Parrilla CU3`, type: 'success' });
+    } catch (err: any) {
+      setNotification({ message: `Error al cargar de parrilla: ${err.message}`, type: 'error' });
+    }
+  };
+
+  // Guardar la escaleta armada actual directamente en la Parrilla Oficial CU3
+  const handleSaveToBmsParrilla = async () => {
+    if (items.length === 0) {
+      setNotification({ message: 'No hay bloques en la escaleta para guardar', type: 'error' });
+      return;
+    }
+
+    try {
+      setIsSendingToDeck(true);
+      await (api as any).replacePlaylist(items);
+      setNotification({ message: 'Escaleta guardada y sincronizada con la Parrilla Oficial (CU3) exitosamente', type: 'success' });
+      if (onLoadToDeckSuccess) onLoadToDeckSuccess();
+    } catch (err: any) {
+      setNotification({ message: `Error al sincronizar con Parrilla: ${err.message}`, type: 'error' });
+    } finally {
+      setIsSendingToDeck(false);
+    }
+  };
+
   const handleSavePlaylist = () => {
     if (items.length === 0) {
       setNotification({ message: 'No hay videos en la lista para guardar', type: 'error' });
@@ -1032,6 +1086,8 @@ export const PlaylistBuilderView: React.FC<PlaylistBuilderViewProps> = ({
         onOpenPlaylistFile={() => openPlaylistFileRef.current?.click()}
         onSavePlaylist={handleSavePlaylist}
         onClearAll={handleClearAll}
+        onLoadFromBmsParrilla={handleLoadFromBmsParrilla}
+        onSaveToBmsParrilla={handleSaveToBmsParrilla}
       />
 
       {/* Banner de Notificación */}

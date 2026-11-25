@@ -450,9 +450,16 @@ class PlayoutBmsController extends Controller
             'observaciones' => 'nullable|string'
         ]);
 
+        $item = ItemParrilla::find($validated['id_item_parrilla']);
+        $matId = $validated['id_material_video'] ?? null;
+        if (!$matId && $item && $item->id_programa) {
+            $mat = MaterialVideo::where('id_programa', $item->id_programa)->orderBy('id', 'desc')->first();
+            if ($mat) $matId = $mat->id;
+        }
+
         $val = ValidacionEmision::create([
             'id_item_parrilla' => $validated['id_item_parrilla'],
-            'id_material_video' => $validated['id_material_video'] ?? null,
+            'id_material_video' => $matId,
             'id_inspector_qc' => auth()->id() ?? 3,
             'resultado_qc' => $validated['resultado_qc'],
             'aspect_ratio' => $validated['aspect_ratio'] ?? '16:9',
@@ -461,7 +468,15 @@ class PlayoutBmsController extends Controller
             'fecha_validacion' => Carbon::now()
         ]);
 
-        return response()->json(['success' => true, 'validacion' => $val]);
+        // Si fue aprobado en QC, actualizar el estado del bloque de parrilla a APROBADO_AIRE (según CU5)
+        if ($item) {
+            $item->estado = ($validated['resultado_qc'] === 'APROBADO' || $validated['resultado_qc'] === 'APROBADO_AIRE') 
+                ? 'APROBADO_AIRE' 
+                : 'RECHAZADO_QC';
+            $item->save();
+        }
+
+        return response()->json(['success' => true, 'validacion' => $val->load(['itemParrilla.programa', 'materialVideo', 'inspector'])]);
     }
 
     // ==========================================
@@ -703,7 +718,65 @@ class PlayoutBmsController extends Controller
 
     public function replacePlayoutPlaylist(Request $request)
     {
-        return response()->json(['success' => true, 'message' => 'Playlist actualizada en web']);
+        $itemsData = $request->input('items', []);
+        
+        $hoy = Carbon::today()->toDateString();
+        $parrilla = Parrilla::where('fecha', $hoy)->first();
+        if (!$parrilla) {
+            $parrilla = Parrilla::create([
+                'fecha' => $hoy,
+                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
+                'descripcion' => 'Parrilla de Emisión Playout ' . $hoy,
+                'id_programador' => auth()->id() ?? 1,
+                'estado' => 'APROBADA',
+                'fecha_creacion' => Carbon::now()
+            ]);
+        }
+
+        // Si se enviaron items desde el armador/builder, sincronizar con item_parrilla
+        if (!empty($itemsData)) {
+            // Limpiar items existentes de hoy
+            ItemParrilla::where('id_parrilla', $parrilla->id)->delete();
+
+            $startTime = Carbon::parse('06:00:00');
+            foreach ($itemsData as $it) {
+                $title = $it['title'] ?? 'Clip de Video';
+                $durationMs = (int)($it['duration_ms'] ?? 30000);
+                $durationSec = max(5, round($durationMs / 1000));
+                $filePath = $it['file_path'] ?? ('/mam/storage/' . Str::slug($title) . '.mp4');
+
+                $programa = Programa::where('titulo', $title)->first();
+                if (!$programa) {
+                    $code = 'PRG-' . strtoupper(Str::random(5));
+                    $programa = Programa::create([
+                        'codigo' => $code,
+                        'titulo' => $title,
+                        'descripcion' => 'Material sincronizado desde Escaleta CU3',
+                        'id_categoria' => 1,
+                        'clasificacion_edad' => 'ATP',
+                        'duracion_estandar_minutos' => max(1, round($durationSec / 60)),
+                        'origen' => 'NACIONAL',
+                        'estado' => 'ACTIVO',
+                        'fecha_registro' => Carbon::now()
+                    ]);
+                }
+
+                $endTime = $startTime->copy()->addSeconds($durationSec);
+                ItemParrilla::create([
+                    'id_parrilla' => $parrilla->id,
+                    'id_programa' => $programa->id,
+                    'hora_inicio' => $startTime->format('H:i:s'),
+                    'hora_fin' => $endTime->format('H:i:s'),
+                    'tipo_emision' => ($it['event_type'] ?? '') === 'COMMERCIAL' ? 'GRABADO' : 'VIVO',
+                    'estado' => 'PROGRAMADO',
+                    'observaciones' => 'Sincronizado desde Armador de Parrilla'
+                ]);
+
+                $startTime = $endTime;
+            }
+        }
+
+        return response()->json(['success' => true, 'message' => 'Escaleta sincronizada con la Parrilla de hoy (CU3)']);
     }
 
     public function addPlayoutItem(Request $request)

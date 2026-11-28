@@ -1,0 +1,8 @@
+# Dependencies installed locally
+/frontend/node_modules/
+/backend/node_modules/
+
+# Generated Vite output
+/frontend/dist/
+/backend/public/dist/
+/backend/public/build/

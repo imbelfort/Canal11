@@ -24,6 +24,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/pagos/generar-qr', [PlayoutBmsController::class, 'generarPagoQr']);
     Route::get('/pagos/consultar/{transaccionId}', [PlayoutBmsController::class, 'consultarPagoQr']);
     Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'confirmarPago']);
+    Route::post('/pagos/simular/{transaccionId}', [PlayoutBmsController::class, 'simularPagoQr']);
     Route::post('/pagos/stripe/checkout', [PlayoutBmsController::class, 'createStripeCheckout'])->middleware('throttle:12,1');
 });
 Route::post('/pagos/callback', [PlayoutBmsController::class, 'handlePagoFacilCallback']);

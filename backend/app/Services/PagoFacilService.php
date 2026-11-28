@@ -106,6 +106,33 @@ class PagoFacilService
         return [];
     }
 
+    public function generarQrSimulado(array $params): array
+    {
+        $reference = 'DEMO-' . Str::ulid();
+        $payload = 'CANAL11:QR-DEMO:' . $reference;
+        $pago = Pago::create([
+            'id_cliente' => $params['id_cliente'],
+            'id_spot' => $params['id_spot'] ?? null,
+            'monto' => $params['monto'],
+            'moneda' => 'BOB',
+            'concepto' => $params['concepto'] ?? 'Pauta publicitaria',
+            'metodo_pago' => 'QR_SIMULADO',
+            'estado' => 'PENDIENTE',
+            'transaccion_id' => $reference,
+            'qr_cadena' => $payload,
+            'fecha_transaccion' => now(),
+        ]);
+
+        return [
+            'success' => true,
+            'pago' => $pago,
+            'transaccion_id' => $reference,
+            'qrBase64' => null,
+            'qr_imagen' => null,
+            'monto' => $pago->monto,
+        ];
+    }
+
     /**
      * Paso 3: Generación del QR (POST /generate-qr)
      * Guarda la orden local y devuelve identificadores y Base64 del QR

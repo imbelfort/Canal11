@@ -22,8 +22,10 @@ export function ParrillaValidationDialog({ onClose }: { onClose: () => void }) {
       .then(data => {
         if (controller.signal.aborted) return;
         setResult(data);
-        const findings = data.errors.length + data.warnings.length;
-        notify(findings ? `Parrilla revisada · ${data.errors.length} errores y ${data.warnings.length} avisos.` : 'Parrilla revisada sin hallazgos.',
+        const errors = data.errors.length;
+        const warnings = data.warnings.length;
+        const findings = errors + warnings;
+        notify(findings ? `Parrilla revisada · ${errors} ${errors === 1 ? 'error' : 'errores'} y ${warnings} ${warnings === 1 ? 'aviso' : 'avisos'}.` : 'Parrilla revisada sin hallazgos.',
           findings ? 'warning' : 'success');
       })
       .catch(err => { if (!controller.signal.aborted) { setError(err.message); notify(err.message, 'error'); } });

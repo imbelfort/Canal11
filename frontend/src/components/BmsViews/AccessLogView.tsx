@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { bmsApi, type AccessEvent, type AccessLogPage } from '../../services/bmsApi';
 import { ErrorAlertBanner } from '../Common/ErrorAlertBanner';
+import { useToast } from '../../context/ToastContext';
 
 const labels: Record<AccessEvent, string> = {
   login_success: 'Inicio de sesión exitoso',
@@ -15,6 +16,7 @@ const date = new Intl.DateTimeFormat('es-BO', {
 const format = new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 });
 
 export function AccessLogView() {
+  const notify = useToast();
   const [event, setEvent] = useState<AccessEvent | ''>('');
   const [page, setPage] = useState(1);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -29,10 +31,10 @@ export function AccessLogView() {
     setError('');
     bmsApi.getAccessLogs(event, cursor, controller.signal)
       .then(result => { if (!controller.signal.aborted) setData(result); })
-      .catch(err => { if (!controller.signal.aborted) setError(err.message); })
+      .catch(err => { if (!controller.signal.aborted) { setError(err.message); notify(err.message, 'error'); } })
       .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [event, cursor, revision]);
+  }, [event, cursor, notify, revision]);
 
   const refresh = () => setRevision(value => value + 1);
   const navigate = (target: string | null, pageNumber: number) => {

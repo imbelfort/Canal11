@@ -709,7 +709,17 @@ class PlayoutBmsController extends Controller
             'total_pautas' => PautaComercial::count(),
             'emisiones_correctas' => EmisionRealLog::where('estado_emision', 'EMITIDO_CORRECTO')->count(),
             'total_pagos' => Pago::count(),
-            'monto_recaudado_bob' => (float) Pago::where('estado', 'PAGADO')->where('moneda', 'BOB')->sum('monto')
+            'monto_recaudado_bob' => (float) Pago::where('estado', 'PAGADO')->where('moneda', 'BOB')
+                ->where('metodo_pago', '!=', 'QR_SIMULADO')->sum('monto'),
+            'metricas' => [
+                'parrillas' => Parrilla::query()->selectRaw('estado, COUNT(*) AS cantidad')->groupBy('estado')->pluck('cantidad', 'estado'),
+                'emisiones' => EmisionRealLog::query()->selectRaw('estado_emision, COUNT(*) AS cantidad')
+                    ->groupBy('estado_emision')->pluck('cantidad', 'estado_emision'),
+                'cobros' => Pago::query()->where('metodo_pago', '!=', 'QR_SIMULADO')
+                    ->selectRaw('estado, COUNT(*) AS cantidad')->groupBy('estado')->pluck('cantidad', 'estado'),
+                'archivos' => ArchivoParrilla::query()->selectRaw("COALESCE(qc->>'status', 'PENDIENTE') AS estado, COUNT(*) AS cantidad")
+                    ->groupBy('estado')->pluck('cantidad', 'estado'),
+            ],
         ];
 
         return response()->json($stats);
@@ -733,8 +743,26 @@ class PlayoutBmsController extends Controller
                 422, 'El spot no pertenece al cliente seleccionado.');
         }
 
-        $res = $pagoFacil->generarCobroQr($validated);
+        $res = config('services.pagofacil.simulate_qr')
+            ? $pagoFacil->generarQrSimulado($validated)
+            : $pagoFacil->generarCobroQr($validated);
         return response()->json($res);
+    }
+
+    public function simularPagoQr(Request $request, string $transaccionId)
+    {
+        $operator = $request->user();
+        abort_unless($operator->canScheduleParrilla(), 403);
+        $pago = Pago::where('metodo_pago', 'QR_SIMULADO')->where('transaccion_id', $transaccionId)->firstOrFail();
+        Pago::whereKey($pago->id)->where('estado', 'PENDIENTE')->update([
+            'estado' => 'PAGADO',
+            'fecha_pago' => now(),
+            'datos_adicionales' => json_encode(['simulado_por' => $operator->getKey()], JSON_THROW_ON_ERROR),
+        ]);
+        $pago->refresh();
+        abort_unless($pago->estado === 'PAGADO', 409, 'El cobro simulado ya no está pendiente.');
+
+        return response()->json(['success' => true, 'pago' => $pago]);
     }
 
     public function createStripeCheckout(Request $request, StripeCheckoutService $stripe)
@@ -781,6 +809,8 @@ class PlayoutBmsController extends Controller
         } elseif ($pago->metodo_pago === 'QR_PAGOFACIL') {
             $pagoFacil->queryTransaction($transaccionId);
             $pago->refresh();
+        } elseif ($pago->metodo_pago === 'QR_SIMULADO') {
+            abort(422, 'Usa el botón Marcar como pagado para este QR simulado.');
         }
         return response()->json(['success' => true, 'pago' => $pago]);
     }

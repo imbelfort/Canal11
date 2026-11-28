@@ -14,6 +14,16 @@ const adminHeaders = () => ({
 
 export type AccessEvent = 'login_success' | 'login_failure' | 'access_denied' | 'request';
 
+export interface GeneralReport {
+  total_usuarios: number;
+  total_programas: number;
+  total_bloques: number;
+  total_pautas: number;
+  total_pagos: number;
+  monto_recaudado_bob: number;
+  metricas: Record<'parrillas' | 'emisiones' | 'cobros' | 'archivos', Record<string, number>>;
+}
+
 export const programRatings = { ATP: 'Todo público', TEEN_14: 'Desde 14 años', ADULTO_18: 'Desde 18 años' } as const;
 export const programOrigins = { NACIONAL: 'Nacional', INTERNACIONAL: 'Internacional', COPRODUCCION: 'Coproducción' } as const;
 
@@ -75,6 +85,7 @@ export const bmsApi = {
 
   // CU1: Usuarios y Roles
   getUsuarios: () => requestJson<any[]>(`${BASE_URL}/v1/usuarios`, { headers: adminHeaders() }),
+  getRoles: (signal?: AbortSignal) => requestJson<{ id: number; nombre: string }[]>(`${BASE_URL}/v1/roles`, { headers: adminHeaders(), signal }),
   createUsuario: async (data: any) => {
     const res = await fetch(`${BASE_URL}/v1/usuarios`, {
       method: 'POST',
@@ -166,15 +177,13 @@ export const bmsApi = {
   },
 
   // CU6: Clientes, Spots y Pautas
-  getClientes: async () => (await fetch(`${LARAVEL_API}/v1/clientes`)).json(),
-  createCliente: async (data: any) => {
-    const res = await fetch(`${LARAVEL_API}/v1/clientes`, {
+  getClientes: () => requestJson<any[]>(`${BASE_URL}/v1/clientes`),
+  createCliente: (data: any) =>
+    requestJson<{ success: boolean; cliente?: any; message?: string }>(`${BASE_URL}/v1/clientes`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
-  },
+      headers: adminHeaders(),
+      body: JSON.stringify(data),
+    }),
   getSpots: async () => requestJson<any[]>(`${BASE_URL}/v1/spots`),
   createSpot: async (data: { id_cliente: number; titulo_spot: string; duracion_segundos: number; id_archivo_parrilla: number | null; fecha_vigencia_inicio?: string | null; fecha_vigencia_fin?: string | null }) =>
     requestJson(`${BASE_URL}/v1/spots`, {
@@ -208,12 +217,12 @@ export const bmsApi = {
   },
 
   // CU8: Reportes Estadísticos
-  getReporteGeneral: async () => (await fetch(`${LARAVEL_API}/v1/reportes/general`)).json(),
+  getReporteGeneral: () => requestJson<GeneralReport>(`${BASE_URL}/v1/reportes/general`),
 
   // Módulo PagoFácil QR
   getPagos: () => requestJson<any[]>(`${BASE_URL}/pagos`, { headers: adminHeaders() }),
   generarPagoQr: (data: { id_cliente: number; id_spot?: number | null; monto: number; concepto: string }) =>
-    requestJson<{ success: boolean; transaccion_id: string; qrBase64: string; qr_imagen: string; monto: number }>(`${BASE_URL}/pagos/generar-qr`, {
+    requestJson<{ success: boolean; transaccion_id: string; qrBase64: string | null; qr_imagen: string | null; monto: number; pago: any }>(`${BASE_URL}/pagos/generar-qr`, {
       method: 'POST',
       headers: adminHeaders(),
       body: JSON.stringify(data)
@@ -226,6 +235,11 @@ export const bmsApi = {
     }),
   confirmarPago: (txId: string) =>
     requestJson<{ success: boolean; pago: any }>(`${BASE_URL}/pagos/confirmar/${encodeURIComponent(txId)}`, {
+      method: 'POST',
+      headers: adminHeaders(),
+    }),
+  marcarQrSimuladoPagado: (txId: string) =>
+    requestJson<{ success: boolean; pago: any }>(`${BASE_URL}/pagos/simular/${encodeURIComponent(txId)}`, {
       method: 'POST',
       headers: adminHeaders(),
     }),

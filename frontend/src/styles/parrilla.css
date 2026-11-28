@@ -200,7 +200,6 @@
 .appearance-contrast { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; }
 .appearance-contrast input { width: 1.15rem; height: 1.15rem; accent-color: var(--color-accent); }
 .screen-visit-count { display: inline-flex; align-items: center; gap: .38rem; padding: .24rem .52rem; border: 1px solid var(--color-hairline); border-radius: 999px; font-size: .85rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.bms-visit-row { display: flex; margin-bottom: .7rem; }
 .operations-footer { justify-content: space-between; flex-wrap: wrap; }
 .operations-footer > span:first-child { display: inline-flex; align-items: center; gap: .4rem; }
 .access-log-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; }

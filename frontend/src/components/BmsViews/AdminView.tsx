@@ -1,23 +1,29 @@
-import { ScreenVisitCount } from '../Common/ScreenVisitCount';
+import { useToast } from '../../context/ToastContext';
 import { AccessLogView } from './AccessLogView';
+import { OperatorRegistration } from './RegistrationDialogs';
+import { ManagementMetrics } from './ManagementMetrics';
 import React, { useState, useEffect } from 'react';
-import { bmsApi } from '../../services/bmsApi';
+import { bmsApi, type GeneralReport } from '../../services/bmsApi';
 import { usePreferences } from '../../context/PreferencesContext';
 import type { AdminSection } from '../../navigation';
-import { Users, Shield, BarChart3, UserCheck, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Users, Shield, BarChart3, Plus, Edit2, Trash2, X, Check } from 'lucide-react';
+
+const currency = new Intl.NumberFormat('es-BO', { style: 'currency', currency: 'BOB' });
 
 export function AdminView({ section, onSectionChange }: {
   section: AdminSection;
   onSectionChange: (section: AdminSection) => void;
 }) {
+  const notify = useToast();
   const { user: currentUser } = usePreferences();
   const activeSubTab = section === 'accesos' || section === 'operaciones' ? 'auditoria' : section;
-  const [stats, setStats] = useState<any>({});
+  const [stats, setStats] = useState<GeneralReport | null>(null);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [auditoria, setAuditoria] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Modal para Editar Usuario
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any | null>(null);
 
   useEffect(() => {
@@ -38,7 +44,7 @@ export function AdminView({ section, onSectionChange }: {
         setAuditoria(a);
       }
     } catch (e) {
-      console.error(e);
+      notify((e as Error).message, 'error');
     } finally {
       setLoading(false);
     }
@@ -46,18 +52,18 @@ export function AdminView({ section, onSectionChange }: {
 
   const handleDeleteUser = async (u: any) => {
     if (u.id_usuario === currentUser?.id_usuario) {
-      alert('Accion denegada: No puede eliminar su propia cuenta de Super Administrador.');
+      notify('No puedes dar de baja tu propia cuenta.', 'error');
       return;
     }
     if (confirm(`¿Confirma dar de baja al operador ${u.nombre} ${u.apellidos} (#${u.id_usuario})?`)) {
       try {
         const res = await bmsApi.deleteUsuario(u.id_usuario);
         if (res.success) {
-          alert('Usuario dado de baja exitosamente.');
+          notify('Operador dado de baja.');
           loadData();
-        }
+        } else notify(res.message || 'No se pudo dar de baja al operador.', 'error');
       } catch (err: any) {
-        alert('Error al eliminar usuario: ' + err.message);
+        notify('No se pudo dar de baja al operador. ' + err.message, 'error');
       }
     }
   };
@@ -71,14 +77,14 @@ export function AdminView({ section, onSectionChange }: {
           onClick={() => onSectionChange('overview')}
         >
           <BarChart3 size={15} />
-          <span>Panel Gerencial y Metricas (CU8)</span>
+          <span>Panel gerencial y métricas</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'usuarios' ? 'active' : ''}`}
           onClick={() => onSectionChange('usuarios')}
         >
           <Users size={15} />
-          <span>Gestion de Personal y Roles (CU1)</span>
+          <span>Personal y roles</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'auditoria' ? 'active' : ''}`}
@@ -91,46 +97,42 @@ export function AdminView({ section, onSectionChange }: {
       </div>
 
       <div className="bms-content-area">
-        <div className="bms-visit-row"><ScreenVisitCount screen={`administracion:${activeSubTab}`} /></div>
-        {activeSubTab === 'usuarios' && <p className="screen-count">{usuarios.length} usuarios</p>}
         {/* SUBTAB 1: PANEL GERENCIAL */}
         {activeSubTab === 'overview' && (
-          <div className="fade-in">
+          <div className="fade-in" aria-busy={loading}>
             <div className="bms-grid-stats">
               <div className="bms-stat-card">
-                <span className="stat-label">Personal Activo</span>
-                <span className="stat-val">{stats.total_usuarios || 0}</span>
+                <span className="stat-label">Personal activo</span>
+                <span className="stat-val">{stats?.total_usuarios ?? '—'}</span>
                 <span className="stat-sub">Operadores con acceso</span>
               </div>
               <div className="bms-stat-card">
-                <span className="stat-label">Programas en Catalogo</span>
-                <span className="stat-val">{stats.total_programas || 0}</span>
+                <span className="stat-label">Programas activos</span>
+                <span className="stat-val">{stats?.total_programas ?? '—'}</span>
                 <span className="stat-sub">Formatos registrados</span>
               </div>
               <div className="bms-stat-card">
-                <span className="stat-label">Bloques en Continuidad</span>
-                <span className="stat-val">{stats.total_bloques || 0}</span>
+                <span className="stat-label">Bloques registrados</span>
+                <span className="stat-val">{stats?.total_bloques ?? '—'}</span>
                 <span className="stat-sub">Programados en parrilla</span>
               </div>
               <div className="bms-stat-card">
-                <span className="stat-label">Comerciales Pautados</span>
-                <span className="stat-val">{stats.total_pautas || 0}</span>
-                <span className="stat-sub">Spots vinculados</span>
+                <span className="stat-label">Pautas comerciales</span>
+                <span className="stat-val">{stats?.total_pautas ?? '—'}</span>
+                <span className="stat-sub">Pases registrados</span>
               </div>
               <div className="bms-stat-card primary-border">
                 <span className="stat-label">Recaudación en bolivianos</span>
-                <span className="stat-val accent-green">Bs. {stats.monto_recaudado_bob || 0}</span>
-                <span className="stat-sub">{stats.total_pagos || 0} transacciones QR</span>
+                <span className="stat-val accent-green">{stats ? currency.format(stats.monto_recaudado_bob) : '—'}</span>
+                <span className="stat-sub">Pagos reales confirmados</span>
               </div>
             </div>
 
-            <div className="bms-card">
-              <h3 className="bms-card-title">Resumen de Control Maestro - Canal 11 (Grupo 12 SC)</h3>
-              <p className="bms-text-muted">
-                Este panel centraliza la toma de decisiones y gobernanza de la estacion de television.
-                Supervise las emisiones legales, audite las acciones de los operadores y fiscalice la recaudacion de publicidad comercial.
-              </p>
-            </div>
+            {stats?.metricas ? <ManagementMetrics data={stats.metricas} /> : (
+              <div className="bms-card">
+                {loading ? <p role="status">Cargando métricas…</p> : <button type="button" className="bms-btn-secondary" onClick={() => void loadData()}>Cargar métricas</button>}
+              </div>
+            )}
           </div>
         )}
 
@@ -138,72 +140,11 @@ export function AdminView({ section, onSectionChange }: {
         {activeSubTab === 'usuarios' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Alta de Nuevo Operador del Canal (CU1)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    nombre: (form.elements.namedItem('nombre') as HTMLInputElement).value,
-                    apellidos: (form.elements.namedItem('apellidos') as HTMLInputElement).value,
-                    ci: (form.elements.namedItem('ci') as HTMLInputElement).value,
-                    email: (form.elements.namedItem('email') as HTMLInputElement).value,
-                    password: (form.elements.namedItem('pass') as HTMLInputElement).value,
-                    rol_id: Number((form.elements.namedItem('rol') as HTMLSelectElement).value)
-                  };
-                  try {
-                    const res = await bmsApi.createUsuario(body);
-                    if (res.success || res.id_usuario) {
-                      alert('Operador registrado satisfactoriamente');
-                      form.reset();
-                      loadData();
-                    } else {
-                      alert('Error al registrar operador: ' + (res.message || 'Verifique los datos'));
-                    }
-                  } catch (err: any) {
-                    alert('Fallo de comunicacion: ' + err.message);
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Nombres</label>
-                    <input name="nombre" required placeholder="Carlos" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Apellidos</label>
-                    <input name="apellidos" required placeholder="Roca" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Cedula de Identidad</label>
-                    <input name="ci" required placeholder="4587123" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Correo Institucional</label>
-                    <input name="email" type="email" required placeholder="operador@canal11.bo" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Contraseña Temporal</label>
-                    <input name="pass" type="password" required placeholder="••••••••" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Rol Funcional</label>
-                    <select name="rol">
-                      <option value="1">ADMINISTRADOR</option>
-                      <option value="2">PROGRAMADOR</option>
-                      <option value="3">ENCARGADO_CONTENIDOS</option>
-                    </select>
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-primary">
-                  <UserCheck size={14} />
-                  <span>Registrar Operador</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">Plantel Activo de Usuarios</h3>
+              <header className="program-catalog-header">
+                <h2>Usuarios del sistema</h2>
+                <button type="button" className="bms-btn-primary" aria-haspopup="dialog" onClick={() => setRegistrationOpen(true)}><Plus size={15} /> Nuevo operador</button>
+              </header>
+              {!usuarios.length && <p role="status">{loading ? 'Cargando usuarios…' : 'No hay usuarios registrados.'}</p>}
               <div className="bms-table-container">
                 <table className="bms-table">
                   <thead>
@@ -313,6 +254,10 @@ export function AdminView({ section, onSectionChange }: {
       </div>
 
       {/* MODAL DE EDICIÓN DE USUARIO */}
+      {activeSubTab === 'usuarios' && registrationOpen && <OperatorRegistration
+        onClose={() => setRegistrationOpen(false)}
+        onCreated={() => { setRegistrationOpen(false); void loadData(); }}
+      />}
       {editingUser && (
         <div className="config-modal-backdrop" onClick={() => setEditingUser(null)}>
           <div className="config-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -340,12 +285,12 @@ export function AdminView({ section, onSectionChange }: {
                 try {
                   const res = await bmsApi.updateUsuario(editingUser.id_usuario, body);
                   if (res.success || res.usuario) {
-                    alert('Datos de operador actualizados exitosamente.');
+                    notify('Datos del operador actualizados.');
                     setEditingUser(null);
                     loadData();
-                  }
+                  } else notify(res.message || 'No se pudo actualizar el operador.', 'error');
                 } catch (err: any) {
-                  alert('Error al modificar: ' + err.message);
+                  notify(err.message, 'error');
                 }
               }}
             >

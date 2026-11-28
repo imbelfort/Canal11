@@ -2,6 +2,7 @@
 import { AlertCircle, ArrowRight, CalendarDays, Check, Eye, EyeOff, Film, LockKeyhole, ShieldCheck, UserRound } from 'lucide-react';
 import { bmsApi } from '../services/bmsApi';
 import type { UserSession } from '../context/PreferencesContext';
+import { useToast } from '../context/ToastContext';
 import '../styles/login.css';
 
 const demoAccounts = import.meta.env.DEV ? [
@@ -11,6 +12,7 @@ const demoAccounts = import.meta.env.DEV ? [
 ] : [];
 
 export function LoginModal({ onLoginSuccess }: { onLoginSuccess: (user: UserSession) => void }) {
+  const notify = useToast();
   const [selectedRole, setSelectedRole] = useState('');
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -40,15 +42,20 @@ export function LoginModal({ onLoginSuccess }: { onLoginSuccess: (user: UserSess
     try {
       const result = await bmsApi.login(login.trim(), password);
       if (!result.success) {
-        setError(result.message || 'Revisa el usuario y la contraseña.');
+        const message = result.message || 'Revisa el usuario y la contraseña.';
+        setError(message);
+        notify(message, 'error');
         return;
       }
 
       localStorage.setItem('playout_token', result.token);
       localStorage.setItem('playout_user', JSON.stringify(result.usuario));
       onLoginSuccess(result.usuario);
+      notify('Sesión iniciada.');
     } catch {
-      setError('No se pudo conectar con Canal 11. Intenta de nuevo.');
+      const message = 'No se pudo conectar con Canal 11. Intenta de nuevo.';
+      setError(message);
+      notify(message, 'error');
     } finally {
       setLoading(false);
     }

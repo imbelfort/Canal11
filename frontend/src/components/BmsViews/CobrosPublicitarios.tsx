@@ -2,6 +2,7 @@ import { useToast } from '../../context/ToastContext';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { bmsApi } from '../../services/bmsApi';
 import { WorkspaceDialog } from '../Common/WorkspaceDialog';
+import { DemoQr } from '../Common/DemoQr';
 
 interface Cobro {
   id: number;
@@ -11,7 +12,8 @@ interface Cobro {
   concepto: string;
   metodo_pago: string;
   estado: string;
-  qr_imagen?: string;
+  qr_imagen?: string | null;
+  qr_cadena?: string | null;
   datos_adicionales?: { checkout_url?: string };
   cliente?: { razon_social: string };
   spot?: { titulo_spot: string };
@@ -27,6 +29,9 @@ interface SpotCobro {
 
 const formatAmount = (amount: number, currency: string) =>
   new Intl.NumberFormat('es-BO', { style: 'currency', currency, currencyDisplay: 'code' }).format(amount);
+
+const methodName = (method: string) => method === 'STRIPE' ? 'Stripe' : method === 'QR_SIMULADO' ? 'QR simulado' : 'PagoFácil QR';
+const actionLabel = (method: string) => method === 'QR_SIMULADO' ? 'Marcar como pagado' : 'Verificar pago';
 
 export function CobrosPublicitarios() {
   const notify = useToast();
@@ -75,9 +80,10 @@ export function CobrosPublicitarios() {
       } else {
         const amount = Number(fields.get('amount'));
         const qr = await bmsApi.generarPagoQr({ id_cliente: selected.id_cliente, id_spot: selected.id, monto: amount, concepto: concept });
-        setDelivery({ id: 0, transaccion_id: qr.transaccion_id, concepto: concept, monto: amount, moneda: 'BOB', metodo_pago: 'QR_PAGOFACIL', estado: 'PENDIENTE', qr_imagen: qr.qrBase64 });
+        setDelivery(qr.pago);
+        notify(qr.pago.metodo_pago === 'QR_SIMULADO' ? 'QR simulado generado.' : 'QR de cobro generado.');
       }
-      notify(method === 'STRIPE' ? 'Enlace de pago generado.' : 'QR de cobro generado.');
+      if (method === 'STRIPE') notify('Enlace de pago generado.');
       setPayments(await bmsApi.getPagos());
     } catch (err) {
       setError((err as Error).message);
@@ -87,15 +93,18 @@ export function CobrosPublicitarios() {
     }
   };
 
-  const verify = async (reference: string) => {
+  const verify = async (payment: Cobro) => {
+    const reference = payment.transaccion_id;
+    const simulated = payment.metodo_pago === 'QR_SIMULADO';
     setBusy(true);
     setError('');
     setNotice('');
     try {
-      const { pago } = await bmsApi.confirmarPago(reference);
+      const { pago } = await (simulated ? bmsApi.marcarQrSimuladoPagado(reference) : bmsApi.confirmarPago(reference));
       setPayments(previous => previous.map(item => item.transaccion_id === reference ? { ...item, ...pago } : item));
       setDelivery(previous => previous?.transaccion_id === reference ? { ...previous, estado: pago.estado } : previous);
-      notify(pago.estado === 'PAGADO' ? 'La pasarela confirmó el pago.' : `Estado del cobro: ${pago.estado}.`, pago.estado === 'PAGADO' ? 'success' : 'info');
+      notify(simulated ? 'QR simulado marcado como pagado.' : pago.estado === 'PAGADO'
+        ? 'La pasarela confirmó el pago.' : `Estado del cobro: ${pago.estado}.`, pago.estado === 'PAGADO' ? 'success' : 'info');
     } catch (err) {
       setError((err as Error).message);
       notify((err as Error).message, 'error');
@@ -121,7 +130,7 @@ export function CobrosPublicitarios() {
             </label>
             <label className="bms-form-group">Método de pago
               <select value={method} onChange={event => setMethod(event.target.value)}>
-                <option value="QR">PagoFácil QR (BOB)</option>
+                <option value="QR">QR (BOB)</option>
                 <option value="STRIPE">Stripe Checkout</option>
               </select>
             </label>
@@ -139,20 +148,24 @@ export function CobrosPublicitarios() {
           <tbody>{payments.map(payment => <tr key={payment.id}>
             <td><strong>{payment.cliente?.razon_social}</strong><small>{payment.spot?.titulo_spot}</small></td>
             <td>{payment.concepto}</td>
-            <td>{payment.metodo_pago === 'STRIPE' ? 'Stripe' : 'PagoFácil QR'}</td>
+            <td>{methodName(payment.metodo_pago)}</td>
             <td>{formatAmount(payment.monto, payment.moneda)}</td>
             <td>{payment.estado}</td>
             <td>{payment.estado === 'PENDIENTE' && <div className="operations-actions">
-              {(payment.qr_imagen || payment.datos_adicionales?.checkout_url) && <button type="button" disabled={busy} onClick={() => { setError(''); setNotice(''); setDelivery(payment); }}>Ver cobro</button>}
-              <button type="button" disabled={busy} onClick={() => void verify(payment.transaccion_id)}>Verificar pago</button>
+              {(payment.qr_imagen || payment.qr_cadena || payment.datos_adicionales?.checkout_url) && <button type="button" disabled={busy} onClick={() => { setError(''); setNotice(''); setDelivery(payment); }}>Ver cobro</button>}
+              <button type="button" disabled={busy} onClick={() => void verify(payment)}>{actionLabel(payment.metodo_pago)}</button>
             </div>}</td>
           </tr>)}</tbody>
         </table></div>
       </section>
-      {delivery && <WorkspaceDialog title={delivery.metodo_pago === 'STRIPE' ? 'Enlace de pago Stripe' : 'QR PagoFácil'} description={delivery.concepto} busy={busy} onClose={() => setDelivery(null)}>
+      {delivery && <WorkspaceDialog title={delivery.metodo_pago === 'STRIPE' ? 'Enlace de pago Stripe' : methodName(delivery.metodo_pago)} description={delivery.concepto} busy={busy} onClose={() => setDelivery(null)}>
         <div className="workspace-dialog-body quality-ingest">
           <strong>{formatAmount(delivery.monto, delivery.moneda)} · {delivery.estado}</strong>
           {delivery.qr_imagen && <img src={delivery.qr_imagen} alt="QR para pagar en PagoFácil" width={200} height={200} />}
+          {delivery.metodo_pago === 'QR_SIMULADO' && <>
+            <p className="bms-text-muted">Este QR es de demostración. Marcarlo como pagado solo cambia el estado de prueba.</p>
+            {delivery.qr_cadena && <DemoQr key={delivery.qr_cadena} payload={delivery.qr_cadena} />}
+          </>}
           {delivery.datos_adicionales?.checkout_url && <div className="operations-actions">
             <a href={delivery.datos_adicionales.checkout_url} target="_blank" rel="noreferrer">Abrir Stripe Checkout</a>
             <button type="button" onClick={async () => {
@@ -160,11 +173,12 @@ export function CobrosPublicitarios() {
                 await navigator.clipboard.writeText(delivery.datos_adicionales!.checkout_url!);
                 notify('Enlace copiado. Puedes compartirlo con el cliente.');
               } catch {
+                notify('No se pudo copiar el enlace.', 'warning');
                 setNotice('Abre Stripe Checkout y copia el enlace desde el navegador.');
               }
             }}>Copiar enlace</button>
           </div>}
-          {delivery.estado === 'PENDIENTE' && <button type="button" className="bms-btn-secondary" disabled={busy} onClick={() => void verify(delivery.transaccion_id)}>Verificar pago</button>}
+          {delivery.estado === 'PENDIENTE' && <button type="button" className="bms-btn-secondary" disabled={busy} onClick={() => void verify(delivery)}>{actionLabel(delivery.metodo_pago)}</button>}
           {notice && <p role="status">{notice}</p>}
           {error && <p role="alert" className="operations-error">{error}</p>}
         </div>

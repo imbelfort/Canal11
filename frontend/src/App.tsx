@@ -10,17 +10,27 @@ import { LoginModal } from './components/LoginModal';
 import { PreferencesModal } from './components/PreferencesModal';
 import { RoleBasedPlayoutView } from './components/RoleBasedPlayoutView';
 import { usePreferences } from './context/PreferencesContext';
+import { useToast } from './context/ToastContext';
 import { availableBmsAreas, bmsHome, type BmsDestination, type SearchTarget } from './navigation';
 import './styles/parrilla.css';
 
 export function App() {
   const { user, setUser, logout, updatePreferences } = usePreferences();
+  const notify = useToast();
   const [screen, setScreen] = useState<'parrilla' | 'bms' | 'audit'>('parrilla');
   const [preferences, setPreferences] = useState(false);
   const [destination, setDestination] = useState<BmsDestination | null>(null);
   const areas = availableBmsAreas(user?.roles ?? []);
   const defaultArea = areas[0];
   const currentDestination = destination && areas.includes(destination.area) ? destination : defaultArea && bmsHome[defaultArea];
+  let visitKey: string = user ? screen : 'login';
+  if (user && screen === 'bms' && currentDestination) {
+    switch (currentDestination.area) {
+      case 'admin': visitKey = `administracion:${currentDestination.section}`; break;
+      case 'programacion': visitKey = `programacion:${currentDestination.section}`; break;
+      case 'qc': visitKey = 'contenidos:qc'; break;
+    }
+  }
   const stripeReturn = new URLSearchParams(window.location.search).get('stripe');
 
   const go = (target: SearchTarget) => {
@@ -65,7 +75,7 @@ export function App() {
         <div className="operations-actions">
           <BoliviaClock />
           <button onClick={() => setPreferences(true)}><Sliders size={16} /> Apariencia</button>
-          {user && <button onClick={() => { setScreen('parrilla'); setDestination(null); logout(); }}><LogOut size={16} /> Salir</button>}
+          {user && <button onClick={() => { setScreen('parrilla'); setDestination(null); logout(); notify('Sesión cerrada.', 'info'); }}><LogOut size={16} /> Salir</button>}
         </div>
       </header>
       <main className="operations-main">
@@ -91,7 +101,7 @@ export function App() {
       </main>
       <footer className="operations-footer">
         <span><Clock size={13} /> Horarios de Bolivia (UTC-4)</span>
-        <ScreenVisitCount screen={user ? screen : 'login'} />
+        <ScreenVisitCount screen={visitKey} />
       </footer>
       <PreferencesModal isOpen={preferences} onClose={() => setPreferences(false)} />
     </div>

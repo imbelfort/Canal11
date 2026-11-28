@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { bmsApi } from '../services/bmsApi';
+import { DemoQr } from './Common/DemoQr';
 
 interface BmsWorkspaceProps {
   currentUser: any;
@@ -22,7 +23,7 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
   const [pagos, setPagos] = useState<any[]>([]);
 
   // Modal QR
-  const [qrModalData, setQrModalData] = useState<{ open: boolean; txId: string; qrImg: string; monto: number; concepto: string } | null>(null);
+  const [qrModalData, setQrModalData] = useState<{ open: boolean; txId: string; qrImg: string | null; demo: string | null; monto: number; concepto: string } | null>(null);
 
   // Form states
   const [selectedClienteForSpot, setSelectedClienteForSpot] = useState<number | ''>('');
@@ -157,6 +158,7 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
         open: true,
         txId: res.transaccion_id,
         qrImg: res.qr_imagen,
+        demo: res.pago.metodo_pago === 'QR_SIMULADO' ? res.pago.qr_cadena : null,
         monto: res.monto,
         concepto
       });
@@ -165,9 +167,9 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
 
   const handleVerificarPago = async () => {
     if (!qrModalData) return;
-    const res = await bmsApi.confirmarPago(qrModalData.txId);
+    const res = await (qrModalData.demo ? bmsApi.marcarQrSimuladoPagado(qrModalData.txId) : bmsApi.confirmarPago(qrModalData.txId));
     if (res.pago.estado === 'PAGADO') {
-      alert('PagoFácil confirmó el pago.');
+      alert(qrModalData.demo ? 'QR simulado marcado como pagado.' : 'PagoFácil confirmó el pago.');
       setQrModalData(null);
       const st = await bmsApi.getReporteGeneral();
       setStats(st);
@@ -189,10 +191,10 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
         {isAdmin && (
           <>
             <button className={`tab-btn ${activeView === 'usuarios' ? 'active' : ''}`} onClick={async () => { setActiveView('usuarios'); setUsuarios(await bmsApi.getUsuarios()); }}>
-              Usuarios y Roles (CU1)
+              Usuarios y Roles
             </button>
             <button className={`tab-btn ${activeView === 'auditoria' ? 'active' : ''}`} onClick={async () => { setActiveView('auditoria'); setAuditoria(await bmsApi.getAuditoria()); }}>
-              Bitacora Auditoria (CU7)
+              Bitacora Auditoria
             </button>
           </>
         )}
@@ -200,16 +202,16 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
         {(isAdmin || isProg) && (
           <>
             <button className={`tab-btn ${activeView === 'catalogo' ? 'active' : ''}`} onClick={async () => { setActiveView('catalogo'); setProgramas(await bmsApi.getProgramas()); }}>
-              Catalogo Programas (CU2)
+              Catalogo Programas
             </button>
             <button className={`tab-btn ${activeView === 'parrilla' ? 'active' : ''}`} onClick={async () => { setActiveView('parrilla'); setParrillaHoy(await bmsApi.getParrillaHoy()); }}>
-              Parrilla y Rundown (CU3)
+              Parrilla y Rundown
             </button>
             <button className={`tab-btn ${activeView === 'clientes' ? 'active' : ''}`} onClick={async () => { setActiveView('clientes'); setClientes(await bmsApi.getClientes()); }}>
-              Clientes y Spots (CU6)
+              Clientes y Spots
             </button>
             <button className={`tab-btn ${activeView === 'pautas' ? 'active' : ''}`} onClick={async () => { setActiveView('pautas'); setPautas(await bmsApi.getPautas()); }}>
-              Pauta de Emision (CU6)
+              Pauta de Emision
             </button>
             <button className={`tab-btn ${activeView === 'pagos' ? 'active' : ''}`} onClick={async () => { setActiveView('pagos'); setPagos(await bmsApi.getPagos()); }}>
               Modulo PagoFacil QR
@@ -220,13 +222,13 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
         {(isAdmin || isQC) && (
           <>
             <button className={`tab-btn ${activeView === 'mam' ? 'active' : ''}`} onClick={async () => { setActiveView('mam'); setMateriales(await bmsApi.getMateriales()); }}>
-              MAM - Materiales Video (CU4)
+              MAM - Materiales Video
             </button>
             <button className={`tab-btn ${activeView === 'qc' ? 'active' : ''}`} onClick={async () => { setActiveView('qc'); setValidaciones(await bmsApi.getValidaciones()); }}>
-              Control Calidad QC (CU5)
+              Control Calidad QC
             </button>
             <button className={`tab-btn ${activeView === 'emision' ? 'active' : ''}`} onClick={async () => { setActiveView('emision'); setEmisiones(await bmsApi.getEmisiones()); }}>
-              As-Run Log / Emision Real (CU7)
+              As-Run Log / Emision Real
             </button>
           </>
         )}
@@ -650,12 +652,13 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
       {qrModalData && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 16, padding: 24, maxWidth: 380, width: '90%', textAlign: 'center' }}>
-            <h3 style={{ margin: 0, color: '#38bdf8' }}>Codigo QR PagoFacil Bolivia</h3>
+            <h3 style={{ margin: 0, color: '#38bdf8' }}>{qrModalData.demo ? 'QR simulado' : 'Código QR PagoFácil'}</h3>
             <p style={{ fontSize: 12, color: '#94a3b8', margin: '8px 0' }}>{qrModalData.concepto}</p>
-            <img src={qrModalData.qrImg} alt="QR" style={{ width: 220, height: 220, margin: '12px auto', background: '#fff', padding: 8, borderRadius: 8 }} />
+            {qrModalData.demo ? <DemoQr payload={qrModalData.demo} /> :
+              qrModalData.qrImg && <img src={qrModalData.qrImg} alt="QR" style={{ width: 220, height: 220, margin: '12px auto', background: '#fff', padding: 8, borderRadius: 8 }} />}
             <div style={{ fontSize: 18, fontWeight: 700, color: '#4ade80', marginBottom: 16 }}>Total: Bs. {qrModalData.monto}</div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="btn-action" onClick={() => void handleVerificarPago().catch(error => alert(error.message))}>Verificar pago</button>
+              <button className="btn-action" onClick={() => void handleVerificarPago().catch(error => alert(error.message))}>{qrModalData.demo ? 'Marcar como pagado' : 'Verificar pago'}</button>
               <button className="btn-action btn-secondary" onClick={() => setQrModalData(null)}>Cerrar</button>
             </div>
           </div>

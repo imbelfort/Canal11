@@ -5,6 +5,7 @@ import { AuditStats } from './AuditStats';
 import { AuditChart } from './AuditChart';
 import { api } from '../../services/api';
 import { ErrorAlertBanner } from '../Common/ErrorAlertBanner';
+import { useToast } from '../../context/ToastContext';
 
 const columns = ['Fecha', 'Contenido', 'Inicio previsto', 'Inicio real', 'Fin real', 'Duración', 'Diferencia', 'Estado'];
 const statusLabels: Record<string, string> = {
@@ -26,6 +27,7 @@ const datePart = (formatter: Intl.DateTimeFormat, value: string | null) => {
 const seconds = (ms: number) => `${number.format(ms / 1000)} s`;
 
 export function AuditView() {
+  const notify = useToast();
   const [logs, setLogs] = useState<AsRunLog[]>([]);
   const [total, setTotal] = useState(0);
   const [stats, setStats] = useState<AuditStatsData | null>(null);
@@ -40,11 +42,12 @@ export function AuditView() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   useEffect(() => {
     let active = true;
-    const fetchLogs = async () => {
+    const fetchLogs = async (announceError = false) => {
       try {
         const [result, summary] = await Promise.all([
           api.getAuditLogs({ status, search, startDate, endDate, limit: pageSize, offset: (page - 1) * pageSize }),
@@ -61,21 +64,45 @@ export function AuditView() {
         setStats(summary);
         setError('');
       } catch (err) {
-        if (active) setError((err as Error).message);
+        if (active) {
+          setError((err as Error).message);
+          if (announceError) notify((err as Error).message, 'error');
+        }
       } finally {
         if (active) setLoading(false);
       }
     };
     setLoading(true);
-    void fetchLogs();
-    const timer = page === 1 && !search && !startDate && !endDate ? window.setInterval(fetchLogs, 10_000) : undefined;
+    void fetchLogs(true);
+    const timer = page === 1 && !search && !startDate && !endDate ? window.setInterval(() => void fetchLogs(), 10_000) : undefined;
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [status, search, startDate, endDate, page, pageSize, revision]);
+  }, [status, search, startDate, endDate, page, pageSize, notify, revision]);
 
   const reload = () => setRevision(value => value + 1);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const response = await fetch(api.getExportCsvUrl({ status, search, startDate, endDate }));
+      if (!response.ok || !response.headers.get('content-type')?.includes('text/csv')) {
+        throw new Error('No se pudo exportar la bitácora.');
+      }
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = response.headers.get('content-disposition')?.match(/filename="?([^";]+)"?/i)?.[1] ?? 'bitacora.csv';
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      notify('CSV de la bitácora listo para descargar.');
+    } catch {
+      notify('No se pudo exportar la bitácora.', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <div className="audit-screen">
@@ -83,7 +110,7 @@ export function AuditView() {
         <div><h1>Bitácora As-Run</h1><p>{total} registros · Hora de Bolivia (UTC−4)</p></div>
         <div className="operations-actions">
           <button type="button" disabled={loading} onClick={reload}><RefreshCw size={15} /> Actualizar</button>
-          <a className="btn-tool primary" href={api.getExportCsvUrl({ status, search, startDate, endDate })}><Download size={15} /> Exportar CSV</a>
+          <button type="button" className="btn-tool primary" disabled={exporting} onClick={() => void exportCsv()}><Download size={15} /> {exporting ? 'Exportando…' : 'Exportar CSV'}</button>
         </div>
       </header>
       <AuditStats stats={stats} />

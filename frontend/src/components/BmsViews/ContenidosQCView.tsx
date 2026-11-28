@@ -2,7 +2,6 @@ import { useToast } from '../../context/ToastContext';
 import { useEffect, useState } from 'react';
 import { CheckCircle2, MessageSquare, Play, RefreshCw, Upload } from 'lucide-react';
 import { WorkspaceDialog } from '../Common/WorkspaceDialog';
-import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import { bmsApi } from '../../services/bmsApi';
 import { requestJson } from '../../services/api/client';
 import { type AnalysisProgress, type UploadProgress, mediaHeaders, qualityLabels, reanalyzeCatalogVideo, uploadCatalogVideo, type MediaQuality } from '../../services/parrillaMedia';
@@ -144,7 +143,7 @@ export function ContenidosQCView() {
       });
       setFiles(previous => previous.map(file => file.id === updated.id ? updated : file));
       setResults(previous => previous.map(result => result.id === updated.id ? { ...result, qc: updated.qc } : result));
-      notify(`Observación guardada para «${noteTarget.title}».`);
+      notify(`Observación ${noteText.trim() ? 'guardada' : 'retirada'} para «${noteTarget.title}».`);
       if (!ingestOpen) setFeedback(`Observación actualizada para «${noteTarget.title}».`);
       setNoteTarget(null);
     } catch (err) {
@@ -189,7 +188,8 @@ export function ContenidosQCView() {
         setQcStatus('');
         const approved = currentResults.filter(result => result.qc?.status === 'APROBADO_TECNICO').length;
         const observed = currentResults.filter(result => result.qc?.status === 'OBSERVADO').length;
-        notify(`Ingesta completa · ${approved} aprobados de ${currentResults.length} archivos guardados.`, approved === currentResults.length ? 'success' : 'warning');
+        const complete = currentResults.length === pendingFiles.length && approved === currentResults.length;
+        notify(`Ingesta · ${approved} aprobados de ${currentResults.length} archivos guardados.`, complete ? 'success' : 'warning');
         setFeedback(`Guardados: ${currentResults.length}. Aprobados: ${approved}. Observados: ${observed}. Pendientes: ${currentResults.length - approved - observed}.`);
       }
     } finally {
@@ -249,7 +249,6 @@ export function ContenidosQCView() {
           <header className="program-catalog-header">
             <div><h1>Catálogo de archivos</h1><p className="bms-text-muted">{files.length} archivos en la vista · {programs.length} programas</p></div>
             <div className="operations-actions">
-              <ScreenVisitCount screen="contenidos:qc" />
               <button type="button" className="parrilla-primary" aria-haspopup="dialog" onClick={() => openIngest()} disabled={operationInProgress}><Upload size={16} /> Ingestar videos</button>
             </div>
           </header>

@@ -323,6 +323,41 @@ body { font-size: 1rem; line-height: 1.55; }
 .workspace-dialog-body { padding: 1rem; }
 .workspace-dialog-body.parrilla-composer { margin: 0; }
 .workspace-video { display: block; width: 100%; max-height: 70dvh; background: #050b1a; border-radius: 8px; }
+.management-metrics {
+  --metric-series-1: var(--color-accent);
+  --metric-series-2: #3165ad;
+  --metric-series-3: #a34d16;
+  --metric-series-4: #8246ac;
+  --metric-series-5: #a63d62;
+  --metric-series-6: #53647d;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+  gap: .85rem;
+}
+:root[data-theme="dark"] .management-metrics {
+  --metric-series-2: #81a8ff;
+  --metric-series-3: #f6b56a;
+  --metric-series-4: #bd9af1;
+  --metric-series-5: #f58aa9;
+  --metric-series-6: #9aacc7;
+}
+:root[data-profile="child"] .management-metrics { --metric-series-4: #337567; }
+:root[data-theme="dark"][data-profile="child"] .management-metrics { --metric-series-4: #71cfb2; }
+.bms-card.metrics-chart { min-width: 0; margin: 0; background: var(--color-canvas-soft); }
+.metrics-chart-header { display: flex; justify-content: space-between; align-items: start; flex-wrap: wrap; gap: .65rem; margin-bottom: .9rem; }
+.metrics-chart-header h3 { margin: 0 0 .18rem; font-size: 1rem; color: var(--color-ink); }
+.metrics-chart-header small, .metrics-chart-values small, .metrics-chart-empty { color: var(--color-text-muted); }
+.metrics-chart-header select { border: 1px solid var(--color-hairline); border-radius: 6px; padding: .42rem .55rem; background: var(--color-field); color: var(--color-ink); font: inherit; }
+.metrics-chart-header select:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.metrics-chart-body { display: flex; align-items: center; flex-wrap: wrap; gap: .85rem 1.1rem; }
+.metrics-chart-round { flex: 0 0 7rem; width: 7rem; height: 7rem; margin-inline: auto; border-radius: 50%; display: grid; place-items: center; }
+.metrics-chart-round > strong { display: grid; place-items: center; color: var(--color-ink); background: var(--color-canvas-soft); border-radius: 50%; width: 4.7rem; height: 4.7rem; font-variant-numeric: tabular-nums; }
+.metrics-chart-values { flex: 1 0 min(100%, 13rem); display: grid; gap: .7rem; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.metrics-chart-values li > div:first-child { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .5rem; align-items: baseline; font-size: .86rem; overflow-wrap: anywhere; }
+.metrics-chart-values strong { font-variant-numeric: tabular-nums; }
+.metrics-chart-swatch { display: inline-block; align-self: center; width: .65rem; height: .65rem; border-radius: 2px; background: var(--metric-color); }
+.metrics-chart-track { height: .5rem; margin-top: .3rem; border-radius: 999px; background: var(--color-field-hover); overflow: hidden; }
+.metrics-chart-track > span { display: block; height: 100%; border-radius: inherit; background: var(--metric-color); }
 .app-toasts { position: fixed; inset: auto 1rem 1rem auto; z-index: 10000; display: grid; gap: .5rem; width: min(26rem, calc(100vw - 2rem)); pointer-events: none; }
 .app-toast { --toast-accent: var(--color-accent); display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .65rem; padding: .75rem; border: 1px solid var(--color-hairline); border-inline-start: 4px solid var(--toast-accent); border-radius: .65rem; color: var(--color-ink); background: var(--color-canvas-soft); box-shadow: var(--surface-shadow); pointer-events: auto; }
 .app-toast[data-kind="success"] { --toast-accent: var(--color-success); }

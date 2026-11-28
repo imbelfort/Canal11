@@ -44,6 +44,7 @@ return [
 
     'pagofacil' => [
         'paid_status' => env('PAGOFACIL_PAID_STATUS'),
+        'simulate_qr' => env('PAGOFACIL_SIMULATE_QR', true),
     ],
 
 ];

@@ -264,7 +264,7 @@ export function ParrillaView({ visible }: { visible: boolean }) {
             }}
             onEnded={finish}
             onError={() => {
-              if (!current) return;
+              if (!current || current.id !== activeId.current) return;
               registerRun('FALLA_TECNICA');
               stop();
               setError('El video no está disponible o su formato no es compatible.');

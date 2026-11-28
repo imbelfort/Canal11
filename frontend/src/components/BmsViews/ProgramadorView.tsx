@@ -1,19 +1,21 @@
 import { useToast } from '../../context/ToastContext';
-import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import React, { useState, useEffect } from 'react';
 import type { CatalogFile } from '../../services/parrillaMedia';
 import { SpotFilePicker } from './SpotFilePicker';
 import { ProgramCatalog } from './ProgramCatalog';
+import { ClientRegistration } from './RegistrationDialogs';
 import { CobrosPublicitarios } from './CobrosPublicitarios';
 import { bmsApi } from '../../services/bmsApi';
 import type { ProgrammingSection } from '../../navigation';
-import { Layers, Tv, CreditCard, Plus, CheckCircle, FileText, UserPlus, Film } from 'lucide-react';
+import { Layers, Tv, CreditCard, Plus, FileText, UserPlus, Film } from 'lucide-react';
 
 export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionChange: (section: ProgrammingSection) => void }> = ({
   section: activeSubTab, onSectionChange: setActiveSubTab,
 }) => {
   const notify = useToast();
   const [parrillaHoy, setParrillaHoy] = useState<any>(null);
+  const [clientRegistrationOpen, setClientRegistrationOpen] = useState(false);
+  const [clientsLoading, setClientsLoading] = useState(true);
   const [clientes, setClientes] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);
   const [pautas, setPautas] = useState<any[]>([]);
@@ -48,8 +50,8 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
   const loadData = async () => {
     try {
       if (activeSubTab === 'clientes') {
-        const cl = await bmsApi.getClientes();
-        setClientes(cl);
+        setClientsLoading(true);
+        try { setClientes(await bmsApi.getClientes()); } finally { setClientsLoading(false); }
       } else if (activeSubTab === 'spots') {
         const sp = await bmsApi.getSpots();
         const cl = await bmsApi.getClientes();
@@ -77,28 +79,28 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
           onClick={() => setActiveSubTab('catalogo')}
         >
           <Tv size={15} />
-          <span>Programas (CU2)</span>
+          <span>Programas</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'clientes' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('clientes')}
         >
           <UserPlus size={15} />
-          <span>Clientes Publicitarios (CU6)</span>
+          <span>Clientes publicitarios</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'spots' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('spots')}
         >
           <Film size={15} />
-          <span>Spots Publicitarios (CU6)</span>
+          <span>Spots publicitarios</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'pautas' ? 'active' : ''}`}
           onClick={() => setActiveSubTab('pautas')}
         >
           <Layers size={15} />
-          <span>Pauta y Tandas Comerciales (CU6)</span>
+          <span>Pautas y tandas comerciales</span>
         </button>
         <button
           className={`bms-tab-btn ${activeSubTab === 'pagos' ? 'active' : ''}`}
@@ -110,12 +112,9 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
       </div>
 
       <div className="bms-content-area">
-        <div className="bms-visit-row"><ScreenVisitCount screen={`programacion:${activeSubTab}`} /></div>
-        {activeSubTab !== 'catalogo' && <p className="screen-count">{{
-          clientes: `${clientes.length} clientes`,
+        {activeSubTab !== 'catalogo' && activeSubTab !== 'pagos' && activeSubTab !== 'clientes' && <p className="screen-count">{{
           spots: `${spots.length} spots`,
           pautas: `${pautas.length} pautas`,
-          pagos: `${pagos.length} pagos`,
         }[activeSubTab]}</p>}
         {activeSubTab === 'catalogo' && <ProgramCatalog />}
 
@@ -123,60 +122,11 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
         {activeSubTab === 'clientes' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Registrar Nuevo Cliente Publicitario (CU6)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    razon_social: (form.elements.namedItem('razon') as HTMLInputElement).value,
-                    nit: (form.elements.namedItem('nit') as HTMLInputElement).value,
-                    contacto: (form.elements.namedItem('contacto') as HTMLInputElement).value,
-                    email: (form.elements.namedItem('email') as HTMLInputElement).value,
-                    telefono: (form.elements.namedItem('tel') as HTMLInputElement).value
-                  };
-                  try {
-                    const res = await bmsApi.createCliente(body);
-                    if (!res.success && !res.cliente) throw new Error(res.message || 'No se pudo registrar el cliente.');
-                    notify(`Cliente «${body.razon_social}» agregado.`);
-                    form.reset();
-                    void loadData();
-                  } catch (err) {
-                    notify((err as Error).message, 'error');
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Razon Social / Empresa</label>
-                    <input name="razon" required placeholder="Cerveceria Boliviana Nacional" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>NIT / Identificacion Tributaria</label>
-                    <input name="nit" required placeholder="1020304050" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Persona de Contacto</label>
-                    <input name="contacto" placeholder="Lic. Andrea Morales" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Correo Electronico</label>
-                    <input name="email" type="email" placeholder="publicidad@empresa.bo" />
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Telefono / Celular</label>
-                    <input name="tel" placeholder="+591 70012345" />
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-primary">
-                  <UserPlus size={14} />
-                  <span>Registrar Cliente</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">Cartera de Clientes Publicitarios</h3>
+              <header className="program-catalog-header">
+                <h2>Clientes publicitarios</h2>
+                <button type="button" className="bms-btn-primary" aria-haspopup="dialog" onClick={() => setClientRegistrationOpen(true)}><UserPlus size={15} /> Nuevo cliente</button>
+              </header>
+              {!clientes.length && <p role="status">{clientsLoading ? 'Cargando clientes…' : 'No hay clientes registrados.'}</p>}
               <div className="bms-table-container">
                 <table className="bms-table">
                   <thead>
@@ -211,7 +161,7 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
         {activeSubTab === 'spots' && (
           <div className="fade-in">
             <div className="bms-card">
-              <h3 className="bms-card-title">Registrar spot publicitario (CU6)</h3>
+              <h3 className="bms-card-title">Registrar spot publicitario</h3>
               <p className="bms-text-muted">
                 Vincula un video aprobado del catálogo y elige el cliente.
               </p>
@@ -334,7 +284,7 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                   notify('Pase publicitario agregado a la Parrilla.');
                 } catch (err) {
                   setSpotFeedback({ error: true, text: (err as Error).message });
-                    notify((err as Error).message, 'error');
+                  notify((err as Error).message, 'error');
                 } finally {
                   setSpotBusy(false);
                 }
@@ -410,6 +360,10 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
 
         {activeSubTab === 'pagos' && <CobrosPublicitarios />}
       </div>
+      {activeSubTab === 'clientes' && clientRegistrationOpen && <ClientRegistration
+        onClose={() => setClientRegistrationOpen(false)}
+        onCreated={() => { setClientRegistrationOpen(false); void loadData(); }}
+      />}
       {spotPicker && <SpotFilePicker onSelect={selectSpotFile} onClose={() => setSpotPicker(null)} />}
     </div>
   );

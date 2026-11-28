@@ -14,6 +14,31 @@ const adminHeaders = () => ({
 
 export type AccessEvent = 'login_success' | 'login_failure' | 'access_denied' | 'request';
 
+export const programRatings = { ATP: 'Todo público', TEEN_14: 'Desde 14 años', ADULTO_18: 'Desde 18 años' } as const;
+export const programOrigins = { NACIONAL: 'Nacional', INTERNACIONAL: 'Internacional', COPRODUCCION: 'Coproducción' } as const;
+
+export interface ProgramCategory {
+  id: number;
+  nombre: string;
+  estado: 'ACTIVO' | 'INACTIVO';
+}
+
+interface ProgramFields {
+  titulo: string;
+  id_categoria: number;
+  descripcion?: string | null;
+  duracion_estandar_minutos: number;
+  clasificacion_edad: keyof typeof programRatings;
+  origen: keyof typeof programOrigins;
+}
+
+export interface CatalogProgram extends ProgramFields {
+  id: number;
+  codigo: string;
+  categoria?: ProgramCategory;
+  estado: 'ACTIVO' | 'INACTIVO' | 'ARCHIVADO';
+}
+
 export interface AccessLogPage {
   entries: {
     id: number;
@@ -82,43 +107,37 @@ export const bmsApi = {
   },
 
   // CU2: Catálogo de Programas y Categorías
-  getCategorias: async () => requestJson<{ id: number; nombre: string }[]>(`${BASE_URL}/v1/categorias`),
+  getCategorias: async () => requestJson<ProgramCategory[]>(`${BASE_URL}/v1/categorias`),
   createCategoria: async (data: { nombre: string; descripcion?: string }) =>
-    requestJson<{ categoria: { id: number; nombre: string } }>(`${BASE_URL}/v1/categorias`, {
+    requestJson<{ categoria: ProgramCategory }>(`${BASE_URL}/v1/categorias`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data),
     }),
-  getProgramas: async () => requestJson<any[]>(`${BASE_URL}/v1/programas`),
-  createPrograma: async (data: { titulo: string; id_categoria: number; duracion_estandar_minutos: number; descripcion: string }) =>
-    requestJson<{ programa: any }>(`${BASE_URL}/v1/programas`, {
+  getProgramas: (signal?: AbortSignal) => requestJson<CatalogProgram[]>(`${BASE_URL}/v1/programas`, { signal }),
+  createPrograma: async (data: ProgramFields) =>
+    requestJson<{ programa: CatalogProgram }>(`${BASE_URL}/v1/programas`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data),
     }),
 
   // CU3: Parrilla
   getParrillaHoy: async () => requestJson<any>(`${BASE_URL}/v1/parrilla/hoy`),
-  addItemParrilla: async (data: any) => {
-    const res = await fetch(`${LARAVEL_API}/v1/items`, {
+  addItemParrilla: (data: any) =>
+    requestJson(`${BASE_URL}/v1/items`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  deleteItemParrilla: async (id: number) => {
-    const res = await fetch(`${LARAVEL_API}/v1/items/${id}`, { method: 'DELETE' });
-    return res.json();
-  },
-  aprobarParrilla: async (id: number) => {
-    const res = await fetch(`${LARAVEL_API}/v1/parrillas/${id}/estado`, {
+    }),
+  deleteItemParrilla: (id: number) =>
+    requestJson(`${BASE_URL}/v1/items/${id}`, { method: 'DELETE', headers: adminHeaders() }),
+  aprobarParrilla: (id: number) =>
+    requestJson(`${BASE_URL}/v1/parrillas/${id}/estado`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify({ estado: 'APROBADA' })
-    });
-    return res.json();
-  },
+    }),
 
   // CU4: MAM Materiales
   getMateriales: async () => (await fetch(`${LARAVEL_API}/v1/materiales`)).json(),

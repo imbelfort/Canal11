@@ -24,6 +24,6 @@ class Parrilla extends Model
 
     public function items()
     {
-        return $this->hasMany(ItemParrilla::class, 'id_parrilla')->orderBy('hora_inicio', 'asc');
+        return $this->hasMany(ItemParrilla::class, 'id_parrilla')->orderBy('hora_inicio')->orderBy('id');
     }
 }

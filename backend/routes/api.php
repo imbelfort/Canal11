@@ -71,17 +71,19 @@ Route::prefix('v1')->group(function () {
 
     // CU2: Catálogo de Programas y Categorías
     Route::get('/categorias', [PlayoutBmsController::class, 'getCategorias']);
-    Route::post('/categorias', [PlayoutBmsController::class, 'createCategoria']);
+    Route::post('/categorias', [PlayoutBmsController::class, 'createCategoria'])->middleware('auth:sanctum');
     Route::get('/programas', [PlayoutBmsController::class, 'getProgramas']);
-    Route::post('/programas', [PlayoutBmsController::class, 'createPrograma']);
+    Route::post('/programas', [PlayoutBmsController::class, 'createPrograma'])->middleware('auth:sanctum');
 
     // CU3: Parrilla de Programación
     Route::get('/parrillas', [PlayoutBmsController::class, 'getParrillas']);
     Route::get('/parrilla/hoy', [PlayoutBmsController::class, 'getParrillaHoy']);
-    Route::post('/parrillas', [PlayoutBmsController::class, 'createParrilla']);
-    Route::put('/parrillas/{id}/estado', [PlayoutBmsController::class, 'updateParrillaEstado']);
-    Route::post('/items', [PlayoutBmsController::class, 'addItemParrilla']);
-    Route::delete('/items/{id}', [PlayoutBmsController::class, 'deleteItemParrilla']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/parrillas', [PlayoutBmsController::class, 'createParrilla']);
+        Route::put('/parrillas/{id}/estado', [PlayoutBmsController::class, 'updateParrillaEstado']);
+        Route::post('/items', [PlayoutBmsController::class, 'addItemParrilla']);
+        Route::delete('/items/{id}', [PlayoutBmsController::class, 'deleteItemParrilla']);
+    });
 
     // CU4: MAM - Materiales de Video
     Route::get('/materiales', [PlayoutBmsController::class, 'getMateriales']);

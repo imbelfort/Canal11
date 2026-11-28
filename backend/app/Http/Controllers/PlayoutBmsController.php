@@ -28,6 +28,9 @@ use Illuminate\Support\Facades\DB;
 
 class PlayoutBmsController extends Controller
 {
+    private const CHANNEL = 'SENIAL_PRINCIPAL_HD';
+    private const TIMEZONE = 'America/La_Paz';
+
     // ==========================================
     // BUSCADOR UNIVERSAL TIPO GMAIL
     // ==========================================
@@ -261,6 +264,7 @@ class PlayoutBmsController extends Controller
 
     public function createCategoria(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $cat = CategoriaPrograma::create($request->validate([
             'nombre' => 'required|string|max:100|unique:categoria_programa,nombre',
             'descripcion' => 'nullable|string'
@@ -275,32 +279,25 @@ class PlayoutBmsController extends Controller
 
     public function createPrograma(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
             'titulo' => 'required|string|max:150',
-            'id_categoria' => 'nullable|integer|exists:categoria_programa,id',
-            'duracion_estandar_minutos' => 'required|integer|min:1',
-            'codigo' => 'nullable|string',
+            'id_categoria' => 'required|integer|exists:categoria_programa,id,estado,ACTIVO',
+            'duracion_estandar_minutos' => 'required|integer|between:1,1440',
+            'codigo' => 'nullable|string|max:30|unique:programa,codigo',
             'descripcion' => 'nullable|string',
-            'clasificacion_edad' => 'nullable|string',
-            'origen' => 'nullable|string'
+            'clasificacion_edad' => 'required|in:ATP,TEEN_14,ADULTO_18',
+            'origen' => 'required|in:NACIONAL,INTERNACIONAL,COPRODUCCION',
         ]);
 
-        // Autogenerar código si no se provee
-        if (empty($validated['codigo'])) {
-            $catId = $validated['id_categoria'] ?? 1;
-            $catPrefix = $catId == 1 ? 'NOT' : ($catId == 2 ? 'DEP' : 'PRG');
-            $count = Programa::count() + 1;
-            $validated['codigo'] = "{$catPrefix}-" . str_pad($count, 3, '0', STR_PAD_LEFT);
-        }
-
         $programa = Programa::create([
-            'codigo' => $validated['codigo'],
+            'codigo' => $validated['codigo'] ?? 'PRG-' . Str::ulid(),
             'titulo' => $validated['titulo'],
-            'descripcion' => $validated['descripcion'] ?? 'Contenido audiovisual estándar',
-            'id_categoria' => $validated['id_categoria'] ?? 1,
-            'clasificacion_edad' => $validated['clasificacion_edad'] ?? 'ATP',
+            'descripcion' => $validated['descripcion'] ?? null,
+            'id_categoria' => $validated['id_categoria'],
+            'clasificacion_edad' => $validated['clasificacion_edad'],
             'duracion_estandar_minutos' => $validated['duracion_estandar_minutos'],
-            'origen' => $validated['origen'] ?? 'NACIONAL',
+            'origen' => $validated['origen'],
             'estado' => 'ACTIVO',
             'fecha_registro' => Carbon::now()
         ]);
@@ -327,67 +324,112 @@ class PlayoutBmsController extends Controller
 
     public function createParrilla(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
-            'fecha' => 'required|date',
-            'canal_senial' => 'nullable|string',
-            'descripcion' => 'nullable|string'
+            'fecha' => 'required|date_format:Y-m-d',
+            'canal_senial' => 'nullable|string|max:50',
+            'descripcion' => 'nullable|string|max:200',
         ]);
 
-        $parrilla = Parrilla::create([
-            'fecha' => $validated['fecha'],
-            'canal_senial' => $validated['canal_senial'] ?? 'SENIAL_PRINCIPAL_HD',
-            'descripcion' => $validated['descripcion'] ?? 'Parrilla diaria de emisión',
-            'id_programador' => auth()->id() ?? 2,
-            'estado' => 'BORRADOR',
-            'fecha_creacion' => Carbon::now()
-        ]);
+        $channel = $validated['canal_senial'] ?? self::CHANNEL;
+        $parrilla = DB::transaction(function () use ($validated, $channel, $request) {
+            $this->lockScheduleWrites();
+            abort_if(Parrilla::where('fecha', $validated['fecha'])->where('canal_senial', $channel)->exists(), 409,
+                'Ya existe una parrilla para esa fecha y señal.');
+
+            return Parrilla::create([
+                'fecha' => $validated['fecha'],
+                'canal_senial' => $channel,
+                'descripcion' => $validated['descripcion'] ?? 'Parrilla diaria de emisión',
+                'id_programador' => $request->user()->getKey(),
+                'estado' => 'BORRADOR',
+                'fecha_creacion' => Carbon::now(self::TIMEZONE),
+            ]);
+        });
 
         return response()->json(['success' => true, 'parrilla' => $parrilla]);
     }
 
     public function updateParrillaEstado(Request $request, $id)
     {
-        $parrilla = Parrilla::findOrFail($id);
-        $parrilla->estado = $request->input('estado', 'APROBADA');
-        $parrilla->save();
+        abort_unless($request->user()->canScheduleParrilla(), 403);
+        $data = $request->validate(['estado' => 'sometimes|required|in:BORRADOR,APROBADA,PUBLICADA,CERRADA']);
+        $parrilla = DB::transaction(function () use ($id, $data, $request) {
+            $this->lockScheduleWrites();
+            $parrilla = Parrilla::findOrFail($id);
+            $target = $data['estado'] ?? 'APROBADA';
+            if ($target === $parrilla->estado) {
+                return $parrilla;
+            }
+            $allowed = match ($parrilla->estado) {
+                'BORRADOR' => ['APROBADA'],
+                'APROBADA' => ['BORRADOR', 'PUBLICADA'],
+                'PUBLICADA' => ['CERRADA'],
+                default => [],
+            };
+            abort_unless(in_array($target, $allowed, true), 409, 'Transición de estado no permitida.');
+            if (in_array($target, ['APROBADA', 'PUBLICADA'], true)) {
+                abort_unless($parrilla->items()->where('estado', '!=', 'CANCELADO')->exists(), 422, 'La parrilla está vacía.');
+                $validation = $this->playoutValidation($this->compilePlayoutPlaylist($parrilla->id));
+                abort_if($validation['errors'] !== [], 422, implode(' ', $validation['errors']));
+            }
+            $parrilla->update(['estado' => $target]);
 
-        AuditoriaSistema::create([
-            'id_usuario' => auth()->id() ?? 2,
-            'tabla_afectada' => 'parrilla',
-            'accion' => 'UPDATE_ESTADO',
-            'detalle' => "Cambio de estado de parrilla #{$id} a {$parrilla->estado}"
-        ]);
+            AuditoriaSistema::create([
+                'id_usuario' => $request->user()->getKey(),
+                'tabla_afectada' => 'parrilla',
+                'accion' => 'UPDATE_ESTADO',
+                'detalle' => "Cambio de estado de parrilla #{$id} a {$parrilla->estado}"
+            ]);
+            return $parrilla;
+        });
 
         return response()->json(['success' => true, 'parrilla' => $parrilla]);
     }
 
     public function addItemParrilla(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
-            'id_parrilla' => 'required|integer',
-            'id_programa' => 'required|integer',
-            'hora_inicio' => 'required|string',
-            'hora_fin' => 'required|string',
-            'tipo_emision' => 'nullable|string',
+            'id_parrilla' => 'required|integer|exists:parrilla,id',
+            'id_programa' => 'required|integer|exists:programa,id',
+            'hora_inicio' => 'required|date_format:H:i,H:i:s',
+            'hora_fin' => 'required|date_format:H:i,H:i:s',
+            'tipo_emision' => 'nullable|in:VIVO,GRABADO,REPETICION,CADENA_OFICIAL',
             'observaciones' => 'nullable|string'
         ]);
 
-        $item = ItemParrilla::create([
-            'id_parrilla' => $validated['id_parrilla'],
-            'id_programa' => $validated['id_programa'],
-            'hora_inicio' => $validated['hora_inicio'],
-            'hora_fin' => $validated['hora_fin'],
-            'tipo_emision' => $validated['tipo_emision'] ?? 'GRABADO',
-            'estado' => 'PROGRAMADO',
-            'observaciones' => $validated['observaciones'] ?? null
-        ]);
+        $item = DB::transaction(function () use ($validated) {
+            $this->lockScheduleWrites();
+            $parrilla = Parrilla::findOrFail($validated['id_parrilla']);
+            $start = Carbon::parse($parrilla->fecha . ' ' . $validated['hora_inicio'], self::TIMEZONE);
+            $end = Carbon::parse($parrilla->fecha . ' ' . $validated['hora_fin'], self::TIMEZONE);
+            $this->assertSlotAvailable($parrilla, $start, $end);
+            $item = ItemParrilla::create([
+                'id_parrilla' => $validated['id_parrilla'],
+                'id_programa' => $validated['id_programa'],
+                'hora_inicio' => $start->format('H:i:s'),
+                'hora_fin' => $end->format('H:i:s'),
+                'tipo_emision' => $validated['tipo_emision'] ?? 'GRABADO',
+                'estado' => 'PROGRAMADO',
+                'observaciones' => $validated['observaciones'] ?? null
+            ]);
+            $this->assertPublishedContinuity($parrilla);
+
+            return $item;
+        });
 
         return response()->json(['success' => true, 'item' => $item->load('programa')]);
     }
 
-    public function deleteItemParrilla($id)
+    public function deleteItemParrilla(Request $request, int $id)
     {
-        ItemParrilla::destroy($id);
+        abort_unless($request->user()->canScheduleParrilla(), 403);
+        DB::transaction(function () use ($id) {
+            $this->lockScheduleWrites();
+            $item = ItemParrilla::with('parrilla')->findOrFail($id);
+            $this->deleteParrillaItems($item->parrilla, $id);
+        });
         return response()->json(['success' => true]);
     }
 
@@ -580,9 +622,11 @@ class PlayoutBmsController extends Controller
         ]);
 
         $pauta = DB::transaction(function () use ($validated) {
-            $item = ItemParrilla::query()->lockForUpdate()->findOrFail($validated['id_item_parrilla']);
+            $this->lockScheduleWrites();
+            $item = ItemParrilla::with('parrilla')->lockForUpdate()->findOrFail($validated['id_item_parrilla']);
             $todayId = $this->parrillaDeHoy()->value('id');
             abort_if($item->id_parrilla !== $todayId || in_array($item->estado, ['EMITIDO', 'CANCELADO'])
+                || $item->parrilla->estado === 'CERRADA'
                 || ($item->media_playout['event_type'] ?? 'VIDEO') === 'COMMERCIAL', 422,
                 'Selecciona un segmento pendiente de la Parrilla de hoy.');
             $spot = SpotPublicitario::with('archivo')->findOrFail($validated['id_spot']);
@@ -590,13 +634,16 @@ class PlayoutBmsController extends Controller
                 'El spot debe estar activo y tener un archivo de video vinculado.');
             abort_if(($spot->archivo->qc['status'] ?? null) !== 'APROBADO_TECNICO', 422, 'El video del spot necesita aprobar el control técnico.');
 
-            return $item->pautas()->create([
+            $pauta = $item->pautas()->create([
                 'id_spot' => $spot->id,
                 'tanda_bloque' => $validated['tanda_bloque'],
                 'orden' => $validated['orden'] ?? ((int) $item->pautas()->reorder()->max('orden') + 1),
                 'hora_estimada' => $validated['hora_estimada'] ?? null,
                 'estado' => 'PAUTADO',
             ]);
+            $this->assertPublishedContinuity($item->parrilla);
+
+            return $pauta;
         });
 
         return response()->json(['success' => true, 'pauta' => $pauta->load(['spot.cliente', 'itemParrilla.programa'])], 201);
@@ -710,9 +757,56 @@ class PlayoutBmsController extends Controller
     // ==========================================
     private function parrillaDeHoy()
     {
-        return Parrilla::whereDate('fecha', Carbon::today('America/La_Paz'))
-            ->where('canal_senial', 'SENIAL_PRINCIPAL_HD')
+        return Parrilla::where('fecha', Carbon::today(self::TIMEZONE)->toDateString())
+            ->where('canal_senial', self::CHANNEL)
             ->orderBy('id');
+    }
+
+    private function lockScheduleWrites(): void
+    {
+        DB::statement('LOCK TABLE parrilla IN SHARE ROW EXCLUSIVE MODE');
+    }
+
+    private function assertSlotAvailable(Parrilla $parrilla, Carbon $start, Carbon $end): void
+    {
+        abort_if($parrilla->estado === 'CERRADA', 409, 'La parrilla está cerrada.');
+        abort_if($start->toDateString() !== $parrilla->fecha || !$start->isSameDay($end) || !$end->gt($start), 422,
+            'El horario debe tener una duración positiva y estar dentro del día de programación.');
+        abort_if($parrilla->items()->where('estado', '!=', 'CANCELADO')
+            ->where('hora_inicio', '<', $end->format('H:i:s'))
+            ->where('hora_fin', '>', $start->format('H:i:s'))->exists(), 409,
+            'El horario coincide con otro evento de la parrilla.');
+    }
+
+    private function scheduleConflicts(Parrilla $parrilla, $spotsByItem): array
+    {
+        $errors = $warnings = [];
+        $last = null;
+        $lastEnd = null;
+        foreach ($parrilla->items()->where('estado', '!=', 'CANCELADO')->get() as $block) {
+            $start = Carbon::parse($parrilla->fecha . ' ' . $block->hora_inicio, self::TIMEZONE);
+            $end = Carbon::parse($parrilla->fecha . ' ' . $block->hora_fin, self::TIMEZONE);
+            if (!$end->gt($start)) {
+                $errors[] = "Bloque #{$block->id}: el fin debe ser posterior al inicio.";
+                continue;
+            }
+            $extraMs = $spotsByItem->get($block->id, 0);
+            $end->addSeconds((int) ceil($extraMs / 1000));
+            if (!$end->isSameDay($start)) {
+                $errors[] = "Bloque #{$block->id}: la tanda supera el día de programación.";
+            }
+            if ($lastEnd && $start->lt($lastEnd)) {
+                $errors[] = "Cruce de horarios entre los bloques #{$last->id} y #{$block->id}.";
+            } elseif ($lastEnd && $start->gt($lastEnd) && $block->estado !== 'EMITIDO') {
+                $warnings[] = "Hueco de continuidad de {$lastEnd->format('H:i:s')} a {$start->format('H:i:s')}.";
+            }
+            if (!$lastEnd || $end->gt($lastEnd)) {
+                $last = $block;
+                $lastEnd = $end;
+            }
+        }
+
+        return [$errors, $warnings];
     }
 
     public function getPlayoutPlaylist()
@@ -720,9 +814,9 @@ class PlayoutBmsController extends Controller
         return response()->json($this->compilePlayoutPlaylist());
     }
 
-    private function compilePlayoutPlaylist(): array
+    private function compilePlayoutPlaylist(?int $scheduleId = null): array
     {
-        $parrilla = $this->parrillaDeHoy()->with([
+        $parrilla = ($scheduleId === null ? $this->parrillaDeHoy() : Parrilla::whereKey($scheduleId))->with([
             'items.ultimaValidacion',
             'items.pautas.spot.archivo',
             'items' => fn ($query) => $query->withCount(['pautas' => fn ($pautas) => $pautas->where('estado', 'PAUTADO')]),
@@ -735,21 +829,23 @@ class PlayoutBmsController extends Controller
             $material = $item->programa?->materiales->first();
             $media = $item->media_playout ?? [];
             $path = $media['file_path'] ?? $material?->ruta_servidor;
+            $timing = $media['timing_mode'] ?? 'AUTO_FOLLOW';
+            $duration = $media['duration_ms'] ?? (($material?->duracion_segundos ?? 0) * 1000);
+            $plannedStart = Carbon::parse($parrilla->fecha . ' ' . $item->hora_inicio, self::TIMEZONE)->toIso8601String();
 
             $segment = [
                 'id' => $item->id,
                 'title' => $media['title'] ?? $item->programa?->titulo ?? 'Bloque ' . $item->hora_inicio,
                 'file_path' => $path,
-                'duration_ms' => $media['duration_ms'] ?? (($material?->duracion_segundos ?? 0) * 1000),
+                'duration_ms' => $this->effectiveDuration($media + ['duration_ms' => $duration]),
                 'in_point_ms' => $media['in_point_ms'] ?? 0,
                 'out_point_ms' => $media['out_point_ms'] ?? 0,
                 'event_type' => $media['event_type'] ?? 'VIDEO',
-                'timing_mode' => $media['timing_mode'] ?? 'AUTO_FOLLOW',
+                'tipo_emision' => $item->tipo_emision,
+                'timing_mode' => $timing === 'MANUAL' ? 'MANUAL_CUE' : $timing,
                 'scheduled_time' => $item->hora_inicio,
-                'not_before' => $media['block_starts_at'] ?? null,
-                'scheduled_at' => !empty($media['start_mode'])
-                    ? Carbon::parse($parrilla->fecha . ' ' . $item->hora_inicio, 'America/La_Paz')->toIso8601String()
-                    : null,
+                'not_before' => $media['block_starts_at'] ?? ($media === [] ? $plannedStart : null),
+                'scheduled_at' => $timing === 'HARD_START' ? $plannedStart : null,
                 'scheduled_spots' => $item->pautas_count,
                 'spot_id' => $media['spot_id'] ?? null,
                 'group_id' => $media['group_id'] ?? null,
@@ -758,7 +854,7 @@ class PlayoutBmsController extends Controller
                 'status' => match (true) {
                     $item->estado === 'EMITIDO' => 'COMPLETED',
                     $item->estado === 'CANCELADO' || $files->get($path)?->bloqueadoPorQc() || in_array($item->ultimaValidacion?->resultado_qc, ['OBSERVADO', 'RECHAZADO_FALLA_AUDIO', 'RECHAZADO_FALLA_VIDEO', 'RECHAZADO_SIN_MATERIAL'], true) => 'SKIPPED',
-                    !$path => 'MISSING',
+                    !$this->playableMedia($path) || $duration <= 0 => 'MISSING',
                     default => 'READY',
                 },
             ];
@@ -774,6 +870,7 @@ class PlayoutBmsController extends Controller
                 $entry = [
                     'id' => -$pauta->id,
                     'pauta_id' => $pauta->id,
+                    'parent_item_id' => $item->id,
                     'title' => $spot->titulo_spot,
                     'file_path' => $spot->archivo?->ruta,
                     'duration_ms' => $spot->archivo?->duracion_ms ?? $spot->duracion_segundos * 1000,
@@ -787,7 +884,7 @@ class PlayoutBmsController extends Controller
                     'status' => match (true) {
                         $pauta->estado === 'EMITIDO' => 'COMPLETED',
                         $segment['status'] === 'SKIPPED' || $spot->estado !== 'ACTIVO' || $spot->archivo?->bloqueadoPorQc() => 'SKIPPED',
-                        !$spot->archivo => 'MISSING',
+                        !$this->playableMedia($spot->archivo?->ruta) => 'MISSING',
                         default => 'READY',
                     },
                 ];
@@ -811,14 +908,50 @@ class PlayoutBmsController extends Controller
         }) ?? collect();
 
         return [
-            'playlist' => ['id' => $parrilla?->id, 'name' => 'Parrilla de hoy', 'total_items' => $items->count()],
+            'playlist' => [
+                'id' => $parrilla?->id,
+                'name' => 'Parrilla de hoy',
+                'date' => $parrilla?->fecha,
+                'channel' => $parrilla?->canal_senial ?? self::CHANNEL,
+                'status' => $parrilla?->estado,
+                'total_items' => $items->count(),
+            ],
             'items' => $items,
         ];
     }
 
     public function validatePlayoutParrilla()
     {
-        $playlist = $this->compilePlayoutPlaylist();
+        return response()->json($this->playoutValidation($this->compilePlayoutPlaylist()));
+    }
+
+    private function playableMedia(?string $path): bool
+    {
+        if (!$path || !preg_match('~^(?:https?://|/(?!/))~i', $path)) {
+            return false;
+        }
+
+        return !preg_match('~^/api/parrilla/media/([A-Za-z0-9]+\.(?:mp4|webm|ogg|ogv))$~', $path, $local)
+            || Storage::disk('local')->exists('parrilla/' . $local[1]);
+    }
+
+    private function effectiveDuration(array $media): int
+    {
+        return empty($media['out_point_ms'])
+            ? (int) $media['duration_ms']
+            : (int) $media['out_point_ms'] - (int) ($media['in_point_ms'] ?? 0);
+    }
+
+    private function assertPublishedContinuity(Parrilla $parrilla): void
+    {
+        if ($parrilla->estado === 'PUBLICADA') {
+            $validation = $this->playoutValidation($this->compilePlayoutPlaylist($parrilla->id));
+            abort_if($validation['errors'] !== [], 409, implode(' ', $validation['errors']));
+        }
+    }
+
+    private function playoutValidation(array $playlist): array
+    {
         $pending = $playlist['items']->reject(fn ($item) => ($item['cancelled'] ?? false) || $item['status'] === 'COMPLETED');
         $files = ArchivoParrilla::whereIn('ruta', $pending->pluck('file_path')->filter()->unique())->get()->keyBy('ruta');
         $errors = [];
@@ -828,6 +961,10 @@ class PlayoutBmsController extends Controller
             $label = $item['title'];
             $path = $item['file_path'];
             $analysis = $files->get($path)?->qc;
+            if (!$path && in_array($item['tipo_emision'] ?? null, ['VIVO', 'CADENA_OFICIAL'], true)) {
+                $warnings[] = $label . ': requiere una fuente externa al monitor web.';
+                continue;
+            }
             if ($item['status'] === 'SKIPPED') {
                 $errors[] = $label . ': bloqueado o pendiente de control técnico.';
                 continue;
@@ -852,28 +989,19 @@ class PlayoutBmsController extends Controller
             }
         }
 
-        $last = null;
-        $parrillaId = $playlist['playlist']['id'];
-        $blocks = ItemParrilla::where('id_parrilla', $parrillaId)->whereNotIn('estado', ['CANCELADO', 'EMITIDO'])
-            ->orderBy('hora_inicio')->orderBy('id')->get();
-        foreach ($blocks as $block) {
-            if ($block->hora_fin <= $block->hora_inicio) {
-                $errors[] = "Bloque #{$block->id}: el fin debe ser posterior al inicio.";
-                continue;
-            }
-            if ($last && $block->hora_inicio < $last->hora_fin) {
-                $errors[] = "Cruce de horarios entre los bloques #{$last->id} y #{$block->id}.";
-            }
-            if (!$last || $block->hora_fin > $last->hora_fin) {
-                $last = $block;
-            }
+        if ($parrilla = Parrilla::find($playlist['playlist']['id'])) {
+            $spotDurations = $playlist['items']->whereNotNull('parent_item_id')->groupBy('parent_item_id')
+                ->map(fn ($spots) => $spots->sum('duration_ms'));
+            [$conflicts, $gaps] = $this->scheduleConflicts($parrilla, $spotDurations);
+            $errors = [...$errors, ...$conflicts];
+            $warnings = [...$warnings, ...$gaps];
         }
 
-        return response()->json([
+        return [
             'pending' => $pending->count(),
             'errors' => $errors,
             'warnings' => $warnings,
-        ]);
+        ];
     }
 
     public function getParrillaFiles(Request $request)
@@ -1027,7 +1155,7 @@ class PlayoutBmsController extends Controller
             'video' => 'required|file|mimetypes:video/mp4,video/webm,video/ogg|max:512000',
             'title' => 'required|string|max:255',
             'duration_ms' => 'nullable|integer|min:1|max:86400000',
-            'program_id' => 'nullable|integer|exists:programa,id',
+            'program_id' => 'nullable|integer|exists:programa,id,estado,ACTIVO',
         ]);
         $path = $data['video']->store('parrilla', 'local');
         abort_unless($path, 500, 'No se pudo guardar el video.');
@@ -1193,14 +1321,14 @@ class PlayoutBmsController extends Controller
     private function savePlayoutItems(Request $request, bool $replace)
     {
         $data = $request->validate([
-            'items' => 'required|array|min:1',
+            'items' => 'required|array|list|min:1',
             'items.*.title' => 'required|string|max:255',
             'items.*.file_path' => ['required', 'string', 'max:2048', 'regex:~^(?:https?://|/(?!/))~i'],
             'items.*.duration_ms' => 'required|integer|min:1|max:86400000',
             'items.*.event_type' => 'nullable|in:VIDEO,COMMERCIAL',
-            'items.*.timing_mode' => 'nullable|in:AUTO_FOLLOW,HARD_START,MANUAL',
+            'items.*.timing_mode' => 'nullable|in:AUTO_FOLLOW,HARD_START,MANUAL,MANUAL_CUE',
             'items.*.start_mode' => 'nullable|in:NOW,SCHEDULED',
-            'items.*.scheduled_time' => 'nullable|required_if:items.*.start_mode,SCHEDULED|date_format:H:i',
+            'items.*.scheduled_time' => 'nullable|required_if:items.*.start_mode,SCHEDULED|date_format:H:i,H:i:s',
             'items.*.group_id' => 'nullable|uuid',
             'items.*.program_title' => 'nullable|string|max:200',
             'items.*.program_id' => 'nullable|integer|exists:programa,id',
@@ -1210,56 +1338,53 @@ class PlayoutBmsController extends Controller
         ]);
 
         $created = DB::transaction(function () use ($data, $request, $replace) {
-            // Serializa la creaci?n de la parrilla diaria y el c?lculo del siguiente horario.
-            DB::statement('LOCK TABLE parrilla IN SHARE ROW EXCLUSIVE MODE');
+            $this->lockScheduleWrites();
             $parrilla = $this->parrillaDeHoy()->first() ?? Parrilla::create([
-                'fecha' => Carbon::today('America/La_Paz')->toDateString(),
-                'canal_senial' => 'SENIAL_PRINCIPAL_HD',
+                'fecha' => Carbon::today(self::TIMEZONE)->toDateString(),
+                'canal_senial' => self::CHANNEL,
                 'descripcion' => 'Parrilla de hoy',
-                'id_programador' => $request->user('sanctum')?->getKey() ?? Usuario::query()->orderBy('id_usuario')->value('id_usuario'),
+                'id_programador' => $request->user('sanctum')->getKey(),
                 'estado' => 'BORRADOR',
-                'fecha_creacion' => Carbon::now('America/La_Paz'),
+                'fecha_creacion' => Carbon::now(self::TIMEZONE),
             ]);
 
             if ($replace) {
                 $this->deleteParrillaItems($parrilla);
             }
 
-            $now = Carbon::now('America/La_Paz')->startOfSecond();
-            $first = $data['items'][0];
-            $mode = $first['start_mode'] ?? null;
-            if ($mode) {
-                $start = $mode === 'SCHEDULED'
-                    ? Carbon::parse($parrilla->fecha . ' ' . $first['scheduled_time'], 'America/La_Paz')
-                    : $now->copy();
-                abort_if($start->lt($now), 422, 'La hora programada ya pas?. Elige una hora futura o Iniciar ahora.');
-                $seconds = collect($data['items'])->sum(fn ($media) => (int) ceil($media['duration_ms'] / 1000));
-                $end = $start->copy()->addSeconds($seconds);
-                abort_unless($end->isSameDay($start), 422, 'La parrilla supera la medianoche.');
-                $overlap = $parrilla->items()->whereNotIn('estado', ['CANCELADO', 'EMITIDO'])
-                    ->where('hora_inicio', '<', $end->format('H:i:s'))
-                    ->where('hora_fin', '>', $start->format('H:i:s'))->exists();
-                abort_if($overlap, 409, 'Ese horario coincide con otro bloque pendiente. Elige una hora libre.');
-            } else {
-                $last = $parrilla->items()->max('hora_fin');
-                $start = $last ? Carbon::parse($parrilla->fecha . ' ' . $last, 'America/La_Paz')->max($now) : $now->copy();
-            }
-
-            $blockStartsAt = $mode ? $start->toIso8601String() : null;
-            return collect($data['items'])->map(function (array $media) use ($parrilla, &$start, $mode, $blockStartsAt) {
-                if ($blockStartsAt) {
-                    $media['block_starts_at'] = $blockStartsAt;
-                }
-                if (!$mode && !empty($media['scheduled_time'])) {
-                    $scheduled = Carbon::parse($parrilla->fecha . ' ' . $media['scheduled_time'], 'America/La_Paz');
-                    abort_if($scheduled->lt($start) && $parrilla->items()->exists(), 422,
-                        'El horario elegido se cruza con los bloques existentes.');
+            $now = Carbon::now(self::TIMEZONE)->startOfSecond();
+            $last = $parrilla->items()->where('estado', '!=', 'CANCELADO')->max('hora_fin');
+            $start = $last ? Carbon::parse($parrilla->fecha . ' ' . $last, self::TIMEZONE)->max($now) : $now->copy();
+            $blockStartsAt = null;
+            $items = collect($data['items'])->map(function (array $media, int $index) use ($parrilla, $now, &$start, &$blockStartsAt) {
+                $mode = $media['start_mode'] ?? null;
+                $scheduledTime = $media['scheduled_time'] ?? null;
+                abort_if($mode !== null && $index !== 0, 422, 'El modo de inicio solo se aplica al primer evento del bloque.');
+                abort_if(($media['timing_mode'] ?? null) === 'HARD_START' && !$scheduledTime && $mode !== 'NOW', 422,
+                    'Un evento de hora fija requiere un horario.');
+                if ($mode === 'NOW') {
+                    abort_unless($parrilla->estado === 'PUBLICADA', 409, 'Publica la parrilla antes de iniciar un bloque ahora.');
+                    $start = $now->copy();
+                } elseif ($scheduledTime) {
+                    $scheduled = Carbon::parse($parrilla->fecha . ' ' . $scheduledTime, self::TIMEZONE);
+                    abort_if($index > 0 && $scheduled->lt($start), 409, 'Los eventos deben seguir el orden de salida.');
                     $start = $scheduled;
                 }
+                abort_if($start->lt($now), 422, 'La hora programada ya pasó.');
+                if ($mode !== null) {
+                    $blockStartsAt = $start->toIso8601String();
+                    $media['timing_mode'] = 'HARD_START';
+                }
+                if ($blockStartsAt || $scheduledTime) {
+                    $media['block_starts_at'] = $scheduledTime ? $start->toIso8601String() : $blockStartsAt;
+                }
 
-                $duration = (int) ceil($media['duration_ms'] / 1000);
+                $effectiveMs = $this->effectiveDuration($media);
+                abort_if($effectiveMs <= 0 || $effectiveMs > 86400000, 422, 'El punto de salida debe ser posterior al punto de entrada.');
+                $media['duration_ms'] = $effectiveMs;
+                $duration = (int) ceil($effectiveMs / 1000);
                 $end = $start->copy()->addSeconds($duration);
-                abort_if(!$start->isSameDay($end), 422, 'La parrilla supera la medianoche.');
+                $this->assertSlotAvailable($parrilla, $start, $end);
 
                 $item = $parrilla->items()->create([
                     'id_programa' => $media['program_id'] ?? null,
@@ -1273,6 +1398,9 @@ class PlayoutBmsController extends Controller
                 $start = $end;
                 return ['id' => $item->id, 'scheduled_time' => $item->hora_inicio] + $media;
             });
+            $this->assertPublishedContinuity($parrilla);
+
+            return $items;
         });
 
         return response()->json(['success' => true, 'items' => $created]);
@@ -1280,18 +1408,37 @@ class PlayoutBmsController extends Controller
 
     private function deleteParrillaItems(Parrilla $parrilla, ?int $id = null): void
     {
+        abort_if($parrilla->estado === 'CERRADA', 409, 'La parrilla está cerrada.');
         $items = $parrilla->items()->when($id !== null, fn ($query) => $query->whereKey($id));
+        if ($id === null) {
+            $items->whereIn('estado', ['PROGRAMADO', 'AJUSTADO']);
+        }
+        $locked = (clone $items)->lockForUpdate()->get();
+        abort_if($id !== null && $locked->isEmpty(), 404, 'El evento no existe en esta parrilla.');
+        abort_if($locked->contains(fn ($item) => in_array($item->estado, ['EN_CURSO', 'EMITIDO', 'CANCELADO'], true)), 409,
+            'El evento ya forma parte del historial operativo.');
         abort_if((clone $items)->where(fn ($query) => $query
             ->has('validaciones')->orHas('pautas')->orHas('emisionesReales'))->exists(), 409,
-            'La selecci?n contiene bloques vinculados con Control de calidad, Pautas o Bit?cora.');
-        $items->delete();
+            'La selección contiene bloques vinculados con Control de calidad, Pautas o Bitácora.');
+        $parrilla->items()->whereKey($locked->modelKeys())->delete();
+
+        $anchor = $id === null ? [] : ($locked->first()->media_playout ?? []);
+        if (($anchor['timing_mode'] ?? null) === 'HARD_START' && !empty($anchor['group_id'])) {
+            $next = $parrilla->items()->where('media_playout->group_id', $anchor['group_id'])
+                ->whereIn('estado', ['PROGRAMADO', 'AJUSTADO'])->first();
+            if ($next) {
+                $next->update(['media_playout' => array_replace($next->media_playout, ['timing_mode' => 'HARD_START'])]);
+            }
+        }
     }
 
     public function deletePlayoutItem(Request $request, int $id)
     {
         abort_unless($request->user('sanctum')?->canScheduleParrilla(), 403);
-        $parrilla = $this->parrillaDeHoy()->firstOrFail();
-        $this->deleteParrillaItems($parrilla, $id);
+        DB::transaction(function () use ($id) {
+            $this->lockScheduleWrites();
+            $this->deleteParrillaItems($this->parrillaDeHoy()->firstOrFail(), $id);
+        });
 
         return response()->json(['success' => true]);
     }
@@ -1299,20 +1446,25 @@ class PlayoutBmsController extends Controller
     public function clearPlayoutPlaylist(Request $request)
     {
         abort_unless($request->user('sanctum')?->canScheduleParrilla(), 403);
-        if ($parrilla = $this->parrillaDeHoy()->first()) {
-            $this->deleteParrillaItems($parrilla);
-        }
+        DB::transaction(function () {
+            $this->lockScheduleWrites();
+            if ($parrilla = $this->parrillaDeHoy()->first()) {
+                $this->deleteParrillaItems($parrilla);
+            }
+        });
 
         return response()->json(['success' => true]);
     }
 
     public function recordPlayoutCompletion(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $data = $request->validate([
             'item_id' => 'required_without:pauta_id|prohibits:pauta_id|integer|min:1',
             'pauta_id' => 'required_without:item_id|prohibits:item_id|integer|min:1',
             'started_at' => 'required|date|before_or_equal:now',
             'duration_ms' => 'required|integer|min:0|max:86400000',
+            'disposition' => 'nullable|in:EMITIDO_CORRECTO,DESPLAZADO,FALLA_TECNICA',
         ]);
 
         DB::transaction(function () use ($request, $data) {
@@ -1323,11 +1475,16 @@ class PlayoutBmsController extends Controller
             if (($pauta?->estado ?? $item->estado) === 'EMITIDO') {
                 return;
             }
+            abort_unless(in_array($item->parrilla->estado, ['PUBLICADA', 'CERRADA'], true), 409, 'La parrilla aún no se ha publicado.');
             abort_if($item->estado === 'CANCELADO' || ($pauta && $pauta->estado !== 'PAUTADO'), 409, 'El evento fue cancelado.');
             $seconds = (int) round($data['duration_ms'] / 1000);
+            $media = $item->media_playout ?? [];
             $planned = $pauta
                 ? ($pauta->spot->archivo?->duracion_ms ?? $pauta->spot->duracion_segundos * 1000)
-                : ($item->media_playout['duration_ms'] ?? null);
+                : $this->effectiveDuration($media + ['duration_ms' => 0]);
+            if (!$pauta && !$planned && $item->id_programa) {
+                $planned = 1000 * (int) $item->programa?->materiales()->where('estado', 'LISTO')->latest('id')->value('duracion_segundos');
+            }
             $start = Carbon::parse($data['started_at'])->setTimezone('America/La_Paz');
             $end = Carbon::now('America/La_Paz');
 
@@ -1337,7 +1494,7 @@ class PlayoutBmsController extends Controller
                 'hora_fin_real' => $end,
                 'duracion_real_segundos' => $seconds,
                 'discrepancia_segundos' => $planned ? $seconds - (int) round($planned / 1000) : 0,
-                'estado_emision' => 'EMITIDO_CORRECTO',
+                'estado_emision' => $data['disposition'] ?? 'EMITIDO_CORRECTO',
                 'operador_emision' => $request->user()->nombre,
                 'observaciones' => 'Reproduccion completada en el monitor web',
                 'fecha_registro' => $end,

@@ -19,8 +19,9 @@ const hasPreview = (item: PlaylistItem) => /^(?:https?:\/\/|\/(?!\/))/i.test(ite
 const playable = (item: PlaylistItem) => item.status === 'READY' && hasPreview(item);
 const scheduledAt = (item: PlaylistItem) => item.scheduled_at ? Date.parse(item.scheduled_at) : null;
 const canStart = (item: PlaylistItem) => {
-  const start = item.not_before ? Date.parse(item.not_before) : scheduledAt(item);
-  return playable(item) && (start === null || start <= Date.now());
+  const earliest = item.not_before ? Date.parse(item.not_before) : 0;
+  const scheduled = scheduledAt(item) ?? 0;
+  return playable(item) && Math.max(earliest, scheduled) <= Date.now();
 };
 
 export function ParrillaView({ visible }: { visible: boolean }) {
@@ -28,6 +29,9 @@ export function ParrillaView({ visible }: { visible: boolean }) {
   const canSchedule = user?.roles.some(role => role === 'PROGRAMADOR' || role === 'ADMINISTRADOR');
   const [notice, setNotice] = useState('');
   const [items, setItems] = useState<PlaylistItem[]>([]);
+  const [schedule, setSchedule] = useState<{ id: number | null; status: string | null } | null>(null);
+  const published = schedule?.status === 'PUBLICADA';
+  const canOperate = canSchedule && published;
   const [preview, setPreview] = useState<PlaylistItem | null>(null);
   const [current, setCurrent] = useState<PlaylistItem | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,12 +46,17 @@ export function ParrillaView({ visible }: { visible: boolean }) {
   const completed = useRef(false);
   const requestVersion = useRef(0);
   const attemptedStarts = useRef(new Set<number>());
+  const finishedLocally = useRef(new Set<number>());
+  const activeId = useRef<number | null>(null);
 
   const refresh = useCallback(async () => {
     const version = ++requestVersion.current;
     try {
       const data = await api.getPlaylist();
-      if (version === requestVersion.current) setItems(data.items);
+      if (version === requestVersion.current) {
+        setSchedule(data.playlist);
+        setItems(data.items.map(item => finishedLocally.current.has(item.id) ? { ...item, status: 'COMPLETED' } : item));
+      }
     } catch (err) {
       if (version === requestVersion.current) setError((err as Error).message);
     } finally {
@@ -62,8 +71,20 @@ export function ParrillaView({ visible }: { visible: boolean }) {
     return () => window.clearInterval(timer);
   }, [canSchedule, refresh, visible]);
 
+  const stop = useCallback(() => {
+    activeId.current = null;
+    video.current?.pause();
+    video.current?.removeAttribute('src');
+    video.current?.load();
+    setCurrent(null);
+    setPlaying(false);
+    setElapsed(0);
+    startedAt.current = null;
+  }, []);
+
   const play = useCallback((item: PlaylistItem) => {
-    if (!canSchedule || !video.current || !canStart(item)) return;
+    if (!canOperate || !video.current || !canStart(item)) return;
+    activeId.current = item.id;
     attemptedStarts.current.add(item.id);
     setError('');
     setCurrent(item);
@@ -74,46 +95,27 @@ export function ParrillaView({ visible }: { visible: boolean }) {
     video.current.src = item.file_path;
     const player = video.current;
     void player.play().catch(err => {
-      if (err.name !== 'AbortError') setError('El monitor no pudo reproducir este video. Revisa la ruta y el formato.');
+      if (err.name === 'AbortError' || activeId.current !== item.id) return;
+      stop();
+      setError('El monitor no pudo reproducir este video. Revisa la ruta y el formato.');
     });
-  }, [canSchedule]);
-
-  useEffect(() => {
-    if (!canSchedule || current) return;
-    const startDue = () => {
-      const now = Date.now();
-      const due = items.find(item => {
-        const start = scheduledAt(item);
-        return start !== null && now >= start && now - start <= 60_000 && playable(item) && !attemptedStarts.current.has(item.id);
-      });
-      if (due) play(due);
-    };
-    startDue();
-    const timer = window.setInterval(startDue, 500);
-    return () => window.clearInterval(timer);
-  }, [canSchedule, current, items, play]);
-
-  const stop = () => {
-    video.current?.pause();
-    video.current?.removeAttribute('src');
-    video.current?.load();
-    setCurrent(null);
-    setPlaying(false);
-    setElapsed(0);
-    startedAt.current = null;
-  };
+  }, [canOperate, stop]);
 
   const playNext = (automatic = false) => {
     const index = current ? items.findIndex(item => item.id === current.id) : -1;
-    const next = items.slice(index + 1).find(playable);
-    if (next && canStart(next) && (!automatic || !current?.group_id || current.group_id === next.group_id || next.scheduled_at)) {
+    const next = items.slice(index + 1).find(item => playable(item) && !finishedLocally.current.has(item.id));
+    const canFollow = next?.timing_mode !== 'MANUAL_CUE'
+      && (!current?.group_id || current.group_id === next?.group_id || next?.timing_mode === 'HARD_START');
+    if (next && canStart(next) && (!automatic || canFollow)) {
       play(next);
     } else stop();
   };
 
-  const finish = () => {
-    if (!canSchedule || !current || !startedAt.current || completed.current) return;
+  const registerRun = useCallback((disposition: 'EMITIDO_CORRECTO' | 'DESPLAZADO' | 'FALLA_TECNICA') => {
+    if (!canSchedule || !current || current.id !== activeId.current || !startedAt.current || completed.current) return false;
     completed.current = true;
+    finishedLocally.current.add(current.id);
+    setItems(previous => previous.map(item => item.id === current.id ? { ...item, status: 'COMPLETED' } : item));
     const began = startedAt.current;
     setPlaying(false);
     const duration = Math.max(0, (video.current?.currentTime ?? 0) * 1000 - (current.in_point_ms ?? 0));
@@ -123,9 +125,56 @@ export function ParrillaView({ visible }: { visible: boolean }) {
         'Content-Type': 'application/json',
         ...mediaHeaders(),
       },
-      body: JSON.stringify({ ...(current.pauta_id ? { pauta_id: current.pauta_id } : { item_id: current.id }), started_at: new Date(began).toISOString(), duration_ms: Math.round(duration) }),
-    }).then(refresh).catch(err => setError(err.message));
-    if (current.timing_mode === 'AUTO_FOLLOW' || current.timing_mode === 'HARD_START') playNext(true);
+      body: JSON.stringify({
+        ...(current.pauta_id ? { pauta_id: current.pauta_id } : { item_id: current.id }),
+        started_at: new Date(began).toISOString(),
+        duration_ms: Math.round(duration),
+        disposition,
+      }),
+    }).then(refresh).catch(err => setError(`No se pudo registrar la emisión de "${current.title}". ${err.message}`));
+    return true;
+  }, [canSchedule, current, refresh]);
+
+  useEffect(() => {
+    if (!canOperate) return;
+    const startDue = () => {
+      const now = Date.now();
+      const due = items.findLast(item => {
+        const start = scheduledAt(item);
+        return item.timing_mode === 'HARD_START' && start !== null && now - start <= 60_000
+          && canStart(item);
+      });
+      if (due && !attemptedStarts.current.has(due.id) && !finishedLocally.current.has(due.id)) {
+        registerRun('DESPLAZADO');
+        play(due);
+      }
+    };
+    startDue();
+    const timer = window.setInterval(startDue, 500);
+    return () => window.clearInterval(timer);
+  }, [canOperate, items, play, registerRun]);
+
+  const finish = () => {
+    if (registerRun('EMITIDO_CORRECTO')) playNext(true);
+  };
+
+  const changeScheduleStatus = async (status: string) => {
+    if (!schedule?.id) return;
+    if (status === 'CERRADA' && !window.confirm('¿Cerrar la parrilla de hoy?')) return;
+    setBusy(true);
+    setError('');
+    try {
+      await requestJson(`/api/v1/parrillas/${schedule.id}/estado`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...mediaHeaders() },
+        body: JSON.stringify({ estado: status }),
+      });
+      await refresh();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const remove = async (item: PlaylistItem) => {
@@ -146,7 +195,11 @@ export function ParrillaView({ visible }: { visible: boolean }) {
     }
   };
 
-  const firstReady = items.find(canStart);
+  const closed = schedule?.status === 'CERRADA';
+  const firstReady = canOperate ? items.find(canStart) : undefined;
+  const nextStatus = schedule?.status === 'BORRADOR' ? ['APROBADA', 'Aprobar']
+    : schedule?.status === 'APROBADA' ? ['PUBLICADA', 'Publicar']
+    : schedule?.status === 'PUBLICADA' ? ['CERRADA', 'Cerrar parrilla'] : null;
   const currentIndex = current ? items.findIndex(item => item.id === current.id) : -1;
   const nextReady = items.slice(currentIndex + 1).find(playable);
   const commercialCount = items.filter(item => item.event_type === 'COMMERCIAL').length;
@@ -155,12 +208,13 @@ export function ParrillaView({ visible }: { visible: boolean }) {
     <div className="parrilla-page">
       <header className="parrilla-heading parrilla-hero">
         <div><h1>Parrilla de hoy</h1>
-          <p>{new Intl.DateTimeFormat('es-BO', { timeZone: 'America/La_Paz', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}{!canSchedule && ' · Modo consulta'}</p>
+          <p>{new Intl.DateTimeFormat('es-BO', { timeZone: 'America/La_Paz', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}{schedule?.status && ` · ${schedule.status}`}{!canSchedule && ' · Modo consulta'}</p>
         </div>
         <div className="operations-actions">
           <button onClick={() => { setError(''); void refresh(); }} disabled={busy}><RefreshCw size={16} /> Actualizar</button>
           <button type="button" aria-haspopup="dialog" onClick={() => setValidationOpen(true)}><ShieldCheck size={16} /> Validar Parrilla</button>
-          {canSchedule && <button className="parrilla-primary" aria-haspopup="dialog" aria-expanded={composerOpen} onClick={() => { setNotice(''); setComposerOpen(true); }}><Plus size={16} /> Armar bloque</button>}
+          {canSchedule && nextStatus && <button type="button" disabled={busy || Boolean(current)} onClick={() => void changeScheduleStatus(nextStatus[0])}>{nextStatus[1]}</button>}
+          {canSchedule && !closed && <button className="parrilla-primary" aria-haspopup="dialog" aria-expanded={composerOpen} onClick={() => { setNotice(''); setComposerOpen(true); }}><Plus size={16} /> Armar bloque</button>}
         </div>
       </header>
       <div className="parrilla-metrics" aria-label="Resumen de la parrilla">
@@ -170,7 +224,7 @@ export function ParrillaView({ visible }: { visible: boolean }) {
       </div>
       {error && <p className="operations-error" role="alert">{error}</p>}
       {notice && <p role="status" className="program-catalog-notice">{notice}</p>}
-      {canSchedule && composerOpen && <ParrillaComposer onClose={() => setComposerOpen(false)} onSave={(count, startsAt, scheduled) => {
+      {canSchedule && !closed && composerOpen && <ParrillaComposer key={String(published)} published={published} onClose={() => setComposerOpen(false)} onSave={(count, startsAt, scheduled) => {
         setNotice(`Bloque guardado con ${count} ${count === 1 ? 'elemento' : 'elementos'}. ${scheduled ? 'Programado' : 'Inicio'} a las ${startsAt} (hora de Bolivia).`);
         setComposerOpen(false);
         void refresh();
@@ -189,14 +243,19 @@ export function ParrillaView({ visible }: { visible: boolean }) {
             onPause={() => setPlaying(false)}
             onTimeUpdate={event => {
               const ms = event.currentTarget.currentTime * 1000;
-              setElapsed(ms);
+              setElapsed(Math.max(0, ms - (current?.in_point_ms ?? 0)));
               if (current?.out_point_ms && ms >= current.out_point_ms) {
                 event.currentTarget.pause();
                 finish();
               }
             }}
             onEnded={finish}
-            onError={() => { if (current) setError('El video no está disponible o su formato no es compatible.'); }}
+            onError={() => {
+              if (!current) return;
+              registerRun('FALLA_TECNICA');
+              stop();
+              setError('El video no está disponible o su formato no es compatible.');
+            }}
           />
           <div className="parrilla-current">
             <strong>{current?.title || 'Sin reproducción'}</strong>
@@ -205,8 +264,8 @@ export function ParrillaView({ visible }: { visible: boolean }) {
           </div>
           <div className="operations-actions">
             <button className="parrilla-primary" disabled={!firstReady || Boolean(current)} onClick={() => firstReady && play(firstReady)}><Play size={16} /> Iniciar</button>
-            <button disabled={!current} onClick={() => playNext()}><SkipForward size={16} /> Siguiente</button>
-            <button disabled={!current} onClick={stop}><Square size={16} /> Detener</button>
+            <button disabled={!current || !canOperate} onClick={() => { registerRun('DESPLAZADO'); playNext(); }}><SkipForward size={16} /> Siguiente</button>
+            <button disabled={!current} onClick={() => { registerRun('DESPLAZADO'); stop(); }}><Square size={16} /> Detener</button>
           </div>
         </section>}
         <section className="operations-panel">
@@ -214,7 +273,7 @@ export function ParrillaView({ visible }: { visible: boolean }) {
           {loading ? <p>Cargando parrilla…</p> : !items.length ? <div className="parrilla-empty">
             <ListVideo size={22} aria-hidden="true" />
             <p>La parrilla de hoy está vacía.</p>
-            {canSchedule && !composerOpen && <div className="operations-actions"><button onClick={() => setComposerOpen(true)}>Armar primer bloque</button></div>}
+            {canSchedule && !closed && !composerOpen && <div className="operations-actions"><button onClick={() => setComposerOpen(true)}>Armar primer bloque</button></div>}
           </div> : (
             <ol className="parrilla-list">
               {items.map((item, index) => (
@@ -231,8 +290,8 @@ export function ParrillaView({ visible }: { visible: boolean }) {
                         {current?.id === item.id ? 'En monitor' : item.status === 'COMPLETED' ? 'Emitido' : playable(item) && !canStart(item) ? 'Programado' : playable(item) ? 'Listo' : item.status === 'SKIPPED' ? 'Bloqueado' : 'Sin video reproducible'}
                       </span>
                     </div>
-                    <button disabled={!(canSchedule ? canStart(item) : hasPreview(item))} title={canSchedule ? 'Reproducir' : 'Ver video'} aria-label={`${canSchedule ? 'Reproducir' : 'Ver'} ${item.title}`} onClick={() => canSchedule ? play(item) : setPreview(item)}><Play size={16} /></button>
-                    {canSchedule && <button disabled={busy || current?.id === item.id || item.status === 'COMPLETED'} title="Quitar" aria-label={`Quitar ${item.title}`} onClick={() => void remove(item)}><Trash2 size={16} /></button>}
+                    <button disabled={!(canOperate ? !current && canStart(item) : hasPreview(item))} title={canOperate ? 'Reproducir' : 'Ver video'} aria-label={`${canOperate ? 'Reproducir' : 'Ver'} ${item.title}`} onClick={() => canOperate ? play(item) : setPreview(item)}><Play size={16} /></button>
+                    {canSchedule && !closed && <button disabled={busy || current?.id === item.id || item.status === 'COMPLETED' || item.cancelled} title="Quitar" aria-label={`Quitar ${item.title}`} onClick={() => void remove(item)}><Trash2 size={16} /></button>}
                   </li>
                 </Fragment>
               ))}
@@ -240,7 +299,7 @@ export function ParrillaView({ visible }: { visible: boolean }) {
           )}
         </section>
       </div>
-      {!canSchedule && preview && <WorkspaceDialog title={preview.title} description="Vista previa del archivo" onClose={() => setPreview(null)}>
+      {preview && <WorkspaceDialog title={preview.title} description="Vista previa del archivo" onClose={() => setPreview(null)}>
         <div className="workspace-dialog-body">
           <video className="workspace-video" src={preview.file_path} controls playsInline preload="metadata" />
         </div>

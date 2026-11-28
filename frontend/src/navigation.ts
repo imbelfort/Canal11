@@ -50,7 +50,7 @@ export const searchOptions: SearchOption[] = [
   { label: 'Clientes publicitarios', group: 'Programación', keywords: 'bms comercial publicidad cu6', target: programming('clientes') },
   { label: 'Spots publicitarios', group: 'Programación', keywords: 'bms anuncios avisos publicidad cu6', target: programming('spots') },
   { label: 'Pauta y tandas comerciales', group: 'Programación', keywords: 'bms publicidad bloques cu6', target: programming('pautas') },
-  { label: 'Cobros y QR PagoFácil', group: 'Programación', keywords: 'bms pagos transacciones', target: programming('pagos') },
+  { label: 'Cobros publicitarios', group: 'Programación', keywords: 'bms pagos transacciones stripe qr pagofacil', target: programming('pagos') },
   { label: 'Archivos y control de calidad', group: 'Contenidos', keywords: 'bms qc mam subir video ingesta validar cu4 cu5', target: { screen: 'bms', destination: { area: 'qc' } } },
 ];
 

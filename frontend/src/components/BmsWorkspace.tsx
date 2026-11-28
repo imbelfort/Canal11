@@ -163,11 +163,11 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
     }
   };
 
-  const handleConfirmarPagoSimulado = async () => {
+  const handleVerificarPago = async () => {
     if (!qrModalData) return;
     const res = await bmsApi.confirmarPago(qrModalData.txId);
-    if (res.success) {
-      alert('Pago confirmado exitosamente en PagoFacil.');
+    if (res.pago.estado === 'PAGADO') {
+      alert('PagoFácil confirmó el pago.');
       setQrModalData(null);
       const st = await bmsApi.getReporteGeneral();
       setStats(st);
@@ -175,7 +175,7 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
         const pg = await bmsApi.getPagos();
         setPagos(pg);
       }
-    }
+    } else alert(`Estado del cobro: ${res.pago.estado}.`);
   };
 
   return (
@@ -655,7 +655,7 @@ export const BmsWorkspace: React.FC<BmsWorkspaceProps> = ({ currentUser, onLogou
             <img src={qrModalData.qrImg} alt="QR" style={{ width: 220, height: 220, margin: '12px auto', background: '#fff', padding: 8, borderRadius: 8 }} />
             <div style={{ fontSize: 18, fontWeight: 700, color: '#4ade80', marginBottom: 16 }}>Total: Bs. {qrModalData.monto}</div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-              <button className="btn-action" onClick={handleConfirmarPagoSimulado}>Confirmar Pago (Simulacion)</button>
+              <button className="btn-action" onClick={() => void handleVerificarPago().catch(error => alert(error.message))}>Verificar pago</button>
               <button className="btn-action btn-secondary" onClick={() => setQrModalData(null)}>Cerrar</button>
             </div>
           </div>

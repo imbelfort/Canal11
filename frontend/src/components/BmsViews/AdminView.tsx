@@ -118,7 +118,7 @@ export function AdminView({ section, onSectionChange }: {
                 <span className="stat-sub">Spots vinculados</span>
               </div>
               <div className="bms-stat-card primary-border">
-                <span className="stat-label">Recaudacion PagoFacil</span>
+                <span className="stat-label">Recaudación en bolivianos</span>
                 <span className="stat-val accent-green">Bs. {stats.monto_recaudado_bob || 0}</span>
                 <span className="stat-sub">{stats.total_pagos || 0} transacciones QR</span>
               </div>

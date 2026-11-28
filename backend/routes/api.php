@@ -19,15 +19,20 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 Route::get('/search', [PlayoutBmsController::class, 'search'])->middleware('auth:sanctum');
 
 // Rutas de PagoFácil Callback / Consulta
-Route::get('/pagos', [PlayoutBmsController::class, 'getPagos']);
-Route::post('/pagos/generar-qr', [PlayoutBmsController::class, 'generarPagoQr']);
-Route::get('/pagos/consultar/{transaccionId}', [PlayoutBmsController::class, 'consultarPagoQr']);
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/pagos', [PlayoutBmsController::class, 'getPagos']);
+    Route::post('/pagos/generar-qr', [PlayoutBmsController::class, 'generarPagoQr']);
+    Route::get('/pagos/consultar/{transaccionId}', [PlayoutBmsController::class, 'consultarPagoQr']);
+    Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'confirmarPago']);
+    Route::post('/pagos/stripe/checkout', [PlayoutBmsController::class, 'createStripeCheckout'])->middleware('throttle:12,1');
+});
 Route::post('/pagos/callback', [PlayoutBmsController::class, 'handlePagoFacilCallback']);
-Route::post('/pagos/confirmar/{transaccionId}', [PlayoutBmsController::class, 'confirmarPago']);
+Route::post('/pagos/stripe/webhook', [PlayoutBmsController::class, 'handleStripeWebhook']);
 
 // Rutas de Playout Web, Auditoría e Incidentes
 Route::get('/parrilla/qc', [PlayoutBmsController::class, 'getQualityFiles'])->middleware('auth:sanctum');
 Route::post('/parrilla/qc/{archivo}', [PlayoutBmsController::class, 'analyzeQualityFile'])->middleware('auth:sanctum');
+Route::patch('/parrilla/qc/{archivo}/observacion', [PlayoutBmsController::class, 'updateQualityNote'])->middleware('auth:sanctum');
 Route::get('/parrilla/archivos', [PlayoutBmsController::class, 'getParrillaFiles'])->middleware('auth:sanctum');
 Route::put('/parrilla/archivos/{archivo}/programa', [PlayoutBmsController::class, 'updateMediaProgram'])->middleware('auth:sanctum');
 Route::post('/parrilla/archivos', [PlayoutBmsController::class, 'storeParrillaFile'])->middleware('auth:sanctum');
@@ -98,7 +103,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/clientes', [PlayoutBmsController::class, 'getClientes']);
     Route::post('/clientes', [PlayoutBmsController::class, 'createCliente']);
     Route::get('/spots', [PlayoutBmsController::class, 'getSpots']);
-    Route::post('/spots', [PlayoutBmsController::class, 'createSpot']);
+    Route::post('/spots', [PlayoutBmsController::class, 'createSpot'])->middleware('auth:sanctum');
     Route::put('/spots/{spot}/archivo', [PlayoutBmsController::class, 'linkSpotFile'])->middleware('auth:sanctum');
     Route::get('/pautas', [PlayoutBmsController::class, 'getPautas']);
     Route::post('/pautas', [PlayoutBmsController::class, 'createPauta'])->middleware('auth:sanctum');

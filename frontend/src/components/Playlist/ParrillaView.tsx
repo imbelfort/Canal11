@@ -1,6 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Play, RefreshCw, SkipForward, Square, Trash2, Plus, Clock3, Film, ListVideo, Monitor, Radio, ShieldCheck } from 'lucide-react';
 import { usePreferences } from '../../context/PreferencesContext';
+import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
 import { mediaHeaders } from '../../services/parrillaMedia';
 import { requestJson } from '../../services/api/client';
@@ -26,8 +27,8 @@ const canStart = (item: PlaylistItem) => {
 
 export function ParrillaView({ visible }: { visible: boolean }) {
   const { user } = usePreferences();
+  const notify = useToast();
   const canSchedule = user?.roles.some(role => role === 'PROGRAMADOR' || role === 'ADMINISTRADOR');
-  const [notice, setNotice] = useState('');
   const [items, setItems] = useState<PlaylistItem[]>([]);
   const [schedule, setSchedule] = useState<{ id: number | null; status: string | null } | null>(null);
   const published = schedule?.status === 'PUBLICADA';
@@ -49,20 +50,24 @@ export function ParrillaView({ visible }: { visible: boolean }) {
   const finishedLocally = useRef(new Set<number>());
   const activeId = useRef<number | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (announce = false) => {
     const version = ++requestVersion.current;
     try {
       const data = await api.getPlaylist();
       if (version === requestVersion.current) {
         setSchedule(data.playlist);
         setItems(data.items.map(item => finishedLocally.current.has(item.id) ? { ...item, status: 'COMPLETED' } : item));
+        if (announce) notify('Parrilla actualizada.');
       }
     } catch (err) {
-      if (version === requestVersion.current) setError((err as Error).message);
+      if (version === requestVersion.current) {
+        setError((err as Error).message);
+        if (announce) notify((err as Error).message, 'error');
+      }
     } finally {
       if (version === requestVersion.current) setLoading(false);
     }
-  }, []);
+  }, [notify]);
 
   useEffect(() => {
     if (visible) void refresh();
@@ -98,8 +103,9 @@ export function ParrillaView({ visible }: { visible: boolean }) {
       if (err.name === 'AbortError' || activeId.current !== item.id) return;
       stop();
       setError('El monitor no pudo reproducir este video. Revisa la ruta y el formato.');
+      notify('El monitor no pudo reproducir este video.', 'error');
     });
-  }, [canOperate, stop]);
+  }, [canOperate, notify, stop]);
 
   const playNext = (automatic = false) => {
     const index = current ? items.findIndex(item => item.id === current.id) : -1;
@@ -131,9 +137,13 @@ export function ParrillaView({ visible }: { visible: boolean }) {
         duration_ms: Math.round(duration),
         disposition,
       }),
-    }).then(refresh).catch(err => setError(`No se pudo registrar la emisión de "${current.title}". ${err.message}`));
+    }).then(() => refresh()).catch(err => {
+      const message = `No se pudo registrar la emisión de «${current.title}». ${err.message}`;
+      setError(message);
+      notify(message, 'error');
+    });
     return true;
-  }, [canSchedule, current, refresh]);
+  }, [canSchedule, current, notify, refresh]);
 
   useEffect(() => {
     if (!canOperate) return;
@@ -169,9 +179,11 @@ export function ParrillaView({ visible }: { visible: boolean }) {
         headers: { 'Content-Type': 'application/json', ...mediaHeaders() },
         body: JSON.stringify({ estado: status }),
       });
+      notify(`Parrilla ${status.toLocaleLowerCase('es-BO')}.`);
       await refresh();
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
     } finally {
       setBusy(false);
     }
@@ -187,9 +199,11 @@ export function ParrillaView({ visible }: { visible: boolean }) {
       } else {
         await api.deleteItem(item.id);
       }
+      notify(`«${item.title}» se retiró de la Parrilla.`);
       await refresh();
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
     } finally {
       setBusy(false);
     }
@@ -211,10 +225,10 @@ export function ParrillaView({ visible }: { visible: boolean }) {
           <p>{new Intl.DateTimeFormat('es-BO', { timeZone: 'America/La_Paz', weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}{schedule?.status && ` · ${schedule.status}`}{!canSchedule && ' · Modo consulta'}</p>
         </div>
         <div className="operations-actions">
-          <button onClick={() => { setError(''); void refresh(); }} disabled={busy}><RefreshCw size={16} /> Actualizar</button>
+          <button onClick={() => { setError(''); void refresh(true); }} disabled={busy}><RefreshCw size={16} /> Actualizar</button>
           <button type="button" aria-haspopup="dialog" onClick={() => setValidationOpen(true)}><ShieldCheck size={16} /> Validar Parrilla</button>
           {canSchedule && nextStatus && <button type="button" disabled={busy || Boolean(current)} onClick={() => void changeScheduleStatus(nextStatus[0])}>{nextStatus[1]}</button>}
-          {canSchedule && !closed && <button className="parrilla-primary" aria-haspopup="dialog" aria-expanded={composerOpen} onClick={() => { setNotice(''); setComposerOpen(true); }}><Plus size={16} /> Armar bloque</button>}
+          {canSchedule && !closed && <button className="parrilla-primary" aria-haspopup="dialog" aria-expanded={composerOpen} onClick={() => setComposerOpen(true)}><Plus size={16} /> Armar bloque</button>}
         </div>
       </header>
       <div className="parrilla-metrics" aria-label="Resumen de la parrilla">
@@ -223,9 +237,8 @@ export function ParrillaView({ visible }: { visible: boolean }) {
         <div><Clock3 size={17} /><span><strong>{durationLabel(totalTime)}</strong> Duración total</span></div>
       </div>
       {error && <p className="operations-error" role="alert">{error}</p>}
-      {notice && <p role="status" className="program-catalog-notice">{notice}</p>}
       {canSchedule && !closed && composerOpen && <ParrillaComposer key={String(published)} published={published} onClose={() => setComposerOpen(false)} onSave={(count, startsAt, scheduled) => {
-        setNotice(`Bloque guardado con ${count} ${count === 1 ? 'elemento' : 'elementos'}. ${scheduled ? 'Programado' : 'Inicio'} a las ${startsAt} (hora de Bolivia).`);
+        notify(`Bloque guardado con ${count} ${count === 1 ? 'elemento' : 'elementos'}. ${scheduled ? 'Programado' : 'Inicio'} a las ${startsAt} (hora de Bolivia).`);
         setComposerOpen(false);
         void refresh();
       }} />}
@@ -255,6 +268,7 @@ export function ParrillaView({ visible }: { visible: boolean }) {
               registerRun('FALLA_TECNICA');
               stop();
               setError('El video no está disponible o su formato no es compatible.');
+              notify('El video no está disponible o su formato no es compatible.', 'error');
             }}
           />
           <div className="parrilla-current">

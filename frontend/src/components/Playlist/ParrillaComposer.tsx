@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, GripVertical, Play, Plus, X } from 'lucide-react';
 import { requestJson } from '../../services/api/client';
@@ -27,6 +28,7 @@ const clockLabel = (seconds: number) => mediaDuration(seconds * 1000);
 const videoPath = /^(?:https?:\/\/|\/(?!\/))/i;
 
 export function ParrillaComposer({ published, onSave, onClose }: { published: boolean; onSave: (count: number, startsAt: string, scheduled: boolean) => void; onClose: () => void }) {
+  const notify = useToast();
   const [preview, setPreview] = useState<CatalogFile | null>(null);
   const [library, setLibrary] = useState<'program' | 'videos' | 'spots'>('videos');
   const [query, setQuery] = useState('');
@@ -156,6 +158,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
       onSave(result.items.length, result.items[0].scheduled_time, scheduleMode === 'scheduled');
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
       setSaving(false);
     }
   };

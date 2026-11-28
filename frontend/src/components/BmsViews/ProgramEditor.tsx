@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { bmsApi, programOrigins, programRatings, type CatalogProgram, type ProgramCategory } from '../../services/bmsApi';
@@ -8,6 +9,7 @@ export function ProgramEditor({ initialCategory = '', onSave, onClose }: {
   onSave: (program: CatalogProgram) => void;
   onClose: () => void;
 }) {
+  const notify = useToast();
   const [categories, setCategories] = useState<ProgramCategory[]>([]);
   const [categoryId, setCategoryId] = useState(initialCategory);
   const [addingCategory, setAddingCategory] = useState(false);
@@ -39,8 +41,10 @@ export function ProgramEditor({ initialCategory = '', onSave, onClose }: {
       setCategoryId(String(categoria.id));
       setCategoryName('');
       setAddingCategory(false);
+      notify(`Categoría «${categoria.nombre}» creada.`);
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
     } finally {
       setSaving(false);
     }
@@ -61,9 +65,11 @@ export function ProgramEditor({ initialCategory = '', onSave, onClose }: {
         duracion_estandar_minutos: Number(fields.get('duration')),
         descripcion: String(fields.get('description')).trim() || null,
       });
+      notify(`Programa «${programa.titulo}» guardado.`);
       onSave(programa);
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
     } finally {
       setSaving(false);
     }

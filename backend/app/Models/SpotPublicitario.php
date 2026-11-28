@@ -33,4 +33,9 @@ class SpotPublicitario extends Model
     {
         return $this->hasMany(PautaComercial::class, 'id_spot');
     }
+
+    public function vigenteEn(string $date): bool
+    {
+        return $this->estado === 'ACTIVO' && $this->fecha_vigencia_inicio <= $date && $date <= $this->fecha_vigencia_fin;
+    }
 }

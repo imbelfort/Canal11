@@ -22,6 +22,7 @@ use App\Models\AuditoriaSistema;
 use App\Models\Reporte;
 use App\Models\Pago;
 use App\Services\PagoFacilService;
+use App\Services\StripeCheckoutService;
 use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -561,32 +562,32 @@ class PlayoutBmsController extends Controller
 
     public function createSpot(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
-            'id_cliente' => 'required|integer|exists:cliente_publicitario,id',
+            'id_cliente' => 'required|integer|exists:cliente_publicitario,id,estado,ACTIVO',
             'id_archivo_parrilla' => 'nullable|integer|exists:archivo_parrilla,id',
             'titulo_spot' => 'required|string|max:150',
-            'duracion_segundos' => 'required|integer|min:1',
-            'codigo_spot' => 'nullable|string',
-            'fecha_vigencia_inicio' => 'nullable|date',
-            'fecha_vigencia_fin' => 'nullable|date'
+            'duracion_segundos' => 'required_without:id_archivo_parrilla|nullable|integer|between:1,86400',
+            'codigo_spot' => 'nullable|string|max:50|unique:spot_publicitario,codigo_spot',
+            'fecha_vigencia_inicio' => 'nullable|date_format:Y-m-d',
+            'fecha_vigencia_fin' => 'nullable|date_format:Y-m-d',
         ]);
 
         $file = isset($validated['id_archivo_parrilla']) ? ArchivoParrilla::findOrFail($validated['id_archivo_parrilla']) : null;
         abort_if($file && ($file->qc['status'] ?? null) !== 'APROBADO_TECNICO', 422, 'Selecciona un video aprobado por QC.');
 
-        if (empty($validated['codigo_spot'])) {
-            $count = SpotPublicitario::count() + 1;
-            $validated['codigo_spot'] = 'SPOT-' . str_pad($count, 3, '0', STR_PAD_LEFT);
-        }
+        $start = $validated['fecha_vigencia_inicio'] ?? Carbon::today(self::TIMEZONE)->toDateString();
+        $end = $validated['fecha_vigencia_fin'] ?? Carbon::parse($start, self::TIMEZONE)->addMonthsNoOverflow(6)->toDateString();
+        abort_if($end < $start, 422, 'La vigencia termina antes de su fecha de inicio.');
 
         $spot = SpotPublicitario::create([
             'id_cliente' => $validated['id_cliente'],
             'id_archivo_parrilla' => $validated['id_archivo_parrilla'] ?? null,
-            'codigo_spot' => $validated['codigo_spot'],
+            'codigo_spot' => $validated['codigo_spot'] ?? 'SPOT-' . Str::ulid(),
             'titulo_spot' => $validated['titulo_spot'],
             'duracion_segundos' => $file ? max(1, (int) round($file->duracion_ms / 1000)) : $validated['duracion_segundos'],
-            'fecha_vigencia_inicio' => $validated['fecha_vigencia_inicio'] ?? Carbon::today(),
-            'fecha_vigencia_fin' => $validated['fecha_vigencia_fin'] ?? Carbon::today()->addMonths(6),
+            'fecha_vigencia_inicio' => $start,
+            'fecha_vigencia_fin' => $end,
             'estado' => 'ACTIVO'
         ]);
 
@@ -595,6 +596,7 @@ class PlayoutBmsController extends Controller
 
     public function linkSpotFile(Request $request, SpotPublicitario $spot)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $data = $request->validate(['id_archivo_parrilla' => 'required|integer|exists:archivo_parrilla,id']);
         $file = ArchivoParrilla::findOrFail($data['id_archivo_parrilla']);
         abort_unless(($file->qc['status'] ?? null) === 'APROBADO_TECNICO', 422, 'Selecciona un video aprobado por QC.');
@@ -613,32 +615,32 @@ class PlayoutBmsController extends Controller
 
     public function createPauta(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
             'id_item_parrilla' => 'required|integer|exists:item_parrilla,id',
             'id_spot' => 'required|integer|exists:spot_publicitario,id',
-            'tanda_bloque' => 'required|in:CORTE_1,CORTE_2,CORTE_3,CORTE_4,INICIO_PROGRAMA,FIN_PROGRAMA',
-            'orden' => 'nullable|integer|min:1',
-            'hora_estimada' => 'nullable|date_format:H:i',
+            'tanda_bloque' => 'required|in:CORTE_1,INICIO_PROGRAMA,FIN_PROGRAMA',
         ]);
 
         $pauta = DB::transaction(function () use ($validated) {
             $this->lockScheduleWrites();
             $item = ItemParrilla::with('parrilla')->lockForUpdate()->findOrFail($validated['id_item_parrilla']);
             $todayId = $this->parrillaDeHoy()->value('id');
-            abort_if($item->id_parrilla !== $todayId || in_array($item->estado, ['EMITIDO', 'CANCELADO'])
+            abort_if($item->id_parrilla !== $todayId || !in_array($item->estado, ['PROGRAMADO', 'AJUSTADO'], true)
                 || $item->parrilla->estado === 'CERRADA'
                 || ($item->media_playout['event_type'] ?? 'VIDEO') === 'COMMERCIAL', 422,
                 'Selecciona un segmento pendiente de la Parrilla de hoy.');
             $spot = SpotPublicitario::with('archivo')->findOrFail($validated['id_spot']);
-            abort_if($spot->estado !== 'ACTIVO' || !$spot->archivo, 422,
-                'El spot debe estar activo y tener un archivo de video vinculado.');
+            abort_unless($spot->vigenteEn($item->parrilla->fecha) && $spot->archivo, 422,
+                'El spot debe estar vigente en la fecha del bloque y tener un video vinculado.');
             abort_if(($spot->archivo->qc['status'] ?? null) !== 'APROBADO_TECNICO', 422, 'El video del spot necesita aprobar el control técnico.');
 
+            $before = $validated['tanda_bloque'] === 'INICIO_PROGRAMA';
             $pauta = $item->pautas()->create([
                 'id_spot' => $spot->id,
-                'tanda_bloque' => $validated['tanda_bloque'],
-                'orden' => $validated['orden'] ?? ((int) $item->pautas()->reorder()->max('orden') + 1),
-                'hora_estimada' => $validated['hora_estimada'] ?? null,
+                'tanda_bloque' => $before ? 'INICIO_PROGRAMA' : 'FIN_PROGRAMA',
+                'orden' => (int) $item->pautas()->reorder()
+                    ->where('tanda_bloque', $before ? '=' : '!=', 'INICIO_PROGRAMA')->max('orden') + 1,
                 'estado' => 'PAUTADO',
             ]);
             $this->assertPublishedContinuity($item->parrilla);
@@ -649,8 +651,9 @@ class PlayoutBmsController extends Controller
         return response()->json(['success' => true, 'pauta' => $pauta->load(['spot.cliente', 'itemParrilla.programa'])], 201);
     }
 
-    public function cancelPauta(PautaComercial $pauta)
+    public function cancelPauta(Request $request, PautaComercial $pauta)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $changed = PautaComercial::whereKey($pauta->id)->where('estado', 'PAUTADO')->update(['estado' => 'CANCELADO']);
         abort_if(!$changed && $pauta->fresh()?->estado !== 'CANCELADO', 409, 'El spot ya no esta pendiente.');
 
@@ -706,7 +709,7 @@ class PlayoutBmsController extends Controller
             'total_pautas' => PautaComercial::count(),
             'emisiones_correctas' => EmisionRealLog::where('estado_emision', 'EMITIDO_CORRECTO')->count(),
             'total_pagos' => Pago::count(),
-            'monto_recaudado_bob' => (float)Pago::where('estado', 'PAGADO')->sum('monto')
+            'monto_recaudado_bob' => (float) Pago::where('estado', 'PAGADO')->where('moneda', 'BOB')->sum('monto')
         ];
 
         return response()->json($stats);
@@ -717,22 +720,50 @@ class PlayoutBmsController extends Controller
     // ==========================================
     public function generarPagoQr(Request $request, PagoFacilService $pagoFacil)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         $validated = $request->validate([
-            'id_cliente' => 'required|integer',
-            'id_spot' => 'nullable|integer',
-            'monto' => 'required|numeric|min:0.1',
-            'concepto' => 'nullable|string',
-            'moneda' => 'nullable|string'
+            'id_cliente' => 'required|integer|exists:cliente_publicitario,id,estado,ACTIVO',
+            'id_spot' => 'nullable|integer|exists:spot_publicitario,id',
+            'monto' => 'required|numeric|between:0.1,99999999.99|decimal:0,2',
+            'concepto' => 'nullable|string|max:255',
+            'moneda' => 'nullable|in:BOB',
         ]);
+        if (isset($validated['id_spot'])) {
+            abort_unless(SpotPublicitario::whereKey($validated['id_spot'])->where('id_cliente', $validated['id_cliente'])->exists(),
+                422, 'El spot no pertenece al cliente seleccionado.');
+        }
 
         $res = $pagoFacil->generarCobroQr($validated);
         return response()->json($res);
     }
 
-    public function consultarPagoQr($transaccionId, PagoFacilService $pagoFacil)
+    public function createStripeCheckout(Request $request, StripeCheckoutService $stripe)
     {
-        $res = $pagoFacil->queryTransaction($transaccionId);
-        return response()->json(['success' => true, 'values' => $res]);
+        abort_unless($request->user()->canScheduleParrilla(), 403);
+        $data = $request->validate([
+            'id_spot' => 'required|integer|exists:spot_publicitario,id',
+            'concepto' => 'required|string|max:255',
+            'request_id' => 'required|uuid',
+        ]);
+        $spot = SpotPublicitario::with('cliente')->findOrFail($data['id_spot']);
+        abort_unless($spot->estado === 'ACTIVO' && $spot->cliente?->estado === 'ACTIVO', 422, 'Selecciona un spot y un cliente activos.');
+        $pago = $stripe->create($spot, $data['concepto'], $data['request_id']);
+
+        return response()->json(['success' => true, 'pago' => $pago], 201);
+    }
+
+    public function handleStripeWebhook(Request $request, StripeCheckoutService $stripe)
+    {
+        $stripe->handleWebhook($request->getContent(), (string) $request->header('Stripe-Signature'));
+
+        return response()->noContent();
+    }
+
+    public function consultarPagoQr(Request $request, string $transaccionId, PagoFacilService $pagoFacil)
+    {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
+        $pago = Pago::where('metodo_pago', 'QR_PAGOFACIL')->where('transaccion_id', $transaccionId)->firstOrFail();
+        return response()->json(['success' => true, 'values' => $pagoFacil->queryTransaction($pago->transaccion_id)]);
     }
 
     public function handlePagoFacilCallback(Request $request, PagoFacilService $pagoFacil)
@@ -741,14 +772,22 @@ class PlayoutBmsController extends Controller
         return response()->json($response);
     }
 
-    public function confirmarPago($transaccionId, PagoFacilService $pagoFacil)
+    public function confirmarPago(Request $request, string $transaccionId, PagoFacilService $pagoFacil, StripeCheckoutService $stripe)
     {
-        $pago = $pagoFacil->confirmarPago($transaccionId, request()->all());
+        abort_unless($request->user()->canScheduleParrilla(), 403);
+        $pago = Pago::where('transaccion_id', $transaccionId)->firstOrFail();
+        if ($pago->metodo_pago === 'STRIPE') {
+            $pago = $stripe->reconcile($pago);
+        } elseif ($pago->metodo_pago === 'QR_PAGOFACIL') {
+            $pagoFacil->queryTransaction($transaccionId);
+            $pago->refresh();
+        }
         return response()->json(['success' => true, 'pago' => $pago]);
     }
 
-    public function getPagos()
+    public function getPagos(Request $request)
     {
+        abort_unless($request->user()->canScheduleParrilla(), 403);
         return response()->json(Pago::with(['cliente', 'spot'])->orderBy('id', 'desc')->get());
     }
 
@@ -825,13 +864,16 @@ class PlayoutBmsController extends Controller
 
         $files = ArchivoParrilla::whereIn('ruta', $parrilla?->items->map(fn ($item) => $item->media_playout['file_path'] ?? null)->filter()->all() ?? [])
             ->get()->keyBy('ruta');
-        $items = $parrilla?->items->flatMap(function (ItemParrilla $item) use ($files, $parrilla) {
+        $spots = SpotPublicitario::whereIn('id', $parrilla?->items->map(fn ($item) => $item->media_playout['spot_id'] ?? null)->filter()->all() ?? [])
+            ->get()->keyBy('id');
+        $items = $parrilla?->items->flatMap(function (ItemParrilla $item) use ($files, $parrilla, $spots) {
             $material = $item->programa?->materiales->first();
             $media = $item->media_playout ?? [];
             $path = $media['file_path'] ?? $material?->ruta_servidor;
             $timing = $media['timing_mode'] ?? 'AUTO_FOLLOW';
             $duration = $media['duration_ms'] ?? (($material?->duracion_segundos ?? 0) * 1000);
             $plannedStart = Carbon::parse($parrilla->fecha . ' ' . $item->hora_inicio, self::TIMEZONE)->toIso8601String();
+            $directSpotId = $media['spot_id'] ?? null;
 
             $segment = [
                 'id' => $item->id,
@@ -847,12 +889,13 @@ class PlayoutBmsController extends Controller
                 'not_before' => $media['block_starts_at'] ?? ($media === [] ? $plannedStart : null),
                 'scheduled_at' => $timing === 'HARD_START' ? $plannedStart : null,
                 'scheduled_spots' => $item->pautas_count,
-                'spot_id' => $media['spot_id'] ?? null,
+                'spot_id' => $directSpotId,
                 'group_id' => $media['group_id'] ?? null,
                 'program_title' => $media['program_title'] ?? $item->programa?->titulo,
                 'cancelled' => $item->estado === 'CANCELADO',
                 'status' => match (true) {
                     $item->estado === 'EMITIDO' => 'COMPLETED',
+                    $directSpotId !== null && !$spots->get($directSpotId)?->vigenteEn($parrilla->fecha) => 'SKIPPED',
                     $item->estado === 'CANCELADO' || $files->get($path)?->bloqueadoPorQc() || in_array($item->ultimaValidacion?->resultado_qc, ['OBSERVADO', 'RECHAZADO_FALLA_AUDIO', 'RECHAZADO_FALLA_VIDEO', 'RECHAZADO_SIN_MATERIAL'], true) => 'SKIPPED',
                     !$this->playableMedia($path) || $duration <= 0 => 'MISSING',
                     default => 'READY',
@@ -883,7 +926,7 @@ class PlayoutBmsController extends Controller
                     'cue_label' => ($isBefore ? 'Antes de ' : 'Después de ') . $segment['title'],
                     'status' => match (true) {
                         $pauta->estado === 'EMITIDO' => 'COMPLETED',
-                        $segment['status'] === 'SKIPPED' || $spot->estado !== 'ACTIVO' || $spot->archivo?->bloqueadoPorQc() => 'SKIPPED',
+                        $segment['status'] === 'SKIPPED' || !$spot->vigenteEn($parrilla->fecha) || $spot->archivo?->bloqueadoPorQc() => 'SKIPPED',
                         !$this->playableMedia($spot->archivo?->ruta) => 'MISSING',
                         default => 'READY',
                     },
@@ -1063,9 +1106,15 @@ class PlayoutBmsController extends Controller
 
     public function getQualityFiles(Request $request)
     {
-        $data = $request->validate(['q' => 'nullable|string|max:150', 'program_id' => 'nullable|integer']);
+        $data = $request->validate([
+            'q' => 'nullable|string|max:150',
+            'program_id' => 'nullable|integer',
+            'qc_status' => 'nullable|in:PENDIENTE,OBSERVADO,APROBADO_TECNICO',
+        ]);
         $files = ArchivoParrilla::with(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot'])
             ->when($data['program_id'] ?? null, fn ($query, $id) => $query->where('id_programa', $id))
+            ->when($data['qc_status'] ?? null, fn ($query, $status) =>
+                $query->whereRaw("COALESCE(qc->>'status', 'PENDIENTE') = ?", [$status]))
             ->when(trim($data['q'] ?? '') !== '', fn ($query) => $query->where('titulo', 'ILIKE', '%' . trim($data['q']) . '%'))
             ->orderByDesc('id')->limit(100)->get();
 
@@ -1130,22 +1179,56 @@ class PlayoutBmsController extends Controller
         ]);
     }
 
+    public function updateQualityNote(Request $request, ArchivoParrilla $archivo)
+    {
+        $operator = $request->user('sanctum');
+        abort_unless($operator?->canIngestMedia(), 403, 'El control de archivos corresponde a Contenidos.');
+        $data = $request->validate(['observacion' => 'present|nullable|string|max:2000']);
+        $text = trim($data['observacion'] ?? '');
+
+        $file = DB::transaction(function () use ($archivo, $operator, $text) {
+            $file = ArchivoParrilla::query()->lockForUpdate()->findOrFail($archivo->id);
+            $analysis = $file->qc ?? ['status' => 'PENDIENTE', 'issues' => []];
+            if ($text === '') {
+                unset($analysis['operator_note']);
+            } else {
+                $analysis['operator_note'] = [
+                    'text' => $text,
+                    'author' => trim($operator->nombre . ' ' . $operator->apellidos),
+                    'user_id' => $operator->getKey(),
+                    'updated_at' => now()->toIso8601String(),
+                ];
+            }
+            $file->update(['qc' => $analysis]);
+
+            return $file;
+        });
+
+        return response()->json($file->load(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot']));
+    }
+
     private function runQualityAnalysis(ArchivoParrilla $archivo, MediaQualityCheck $quality, ?callable $progress = null): ArchivoParrilla
     {
         $result = $quality->inspect($archivo->ruta, $progress ? fn () => $progress(50, 'reading') : null);
         if ($progress) {
             $progress(75, 'saving');
         }
-        DB::transaction(function () use ($archivo, $result) {
-            $archivo->update(['qc' => $result] + ($result['status'] === 'APROBADO_TECNICO'
+        $file = DB::transaction(function () use ($archivo, $result) {
+            $file = ArchivoParrilla::query()->lockForUpdate()->findOrFail($archivo->id);
+            if (isset($file->qc['operator_note'])) {
+                $result['operator_note'] = $file->qc['operator_note'];
+            }
+            $file->update(['qc' => $result] + ($result['status'] === 'APROBADO_TECNICO'
                 ? ['duracion_ms' => $result['duration_ms']] : []));
-            MaterialVideo::where('ruta_servidor', $archivo->ruta)
-                ->where('codigo_material', 'MAM-QC-' . $archivo->id)
+            MaterialVideo::where('ruta_servidor', $file->ruta)
+                ->where('codigo_material', 'MAM-QC-' . $file->id)
                 ->whereIn('estado', ['INGESTADO', 'LISTO', 'CUARENTENA'])
-                ->update($this->mamTechnicalFields($archivo));
+                ->update($this->mamTechnicalFields($file));
+
+            return $file;
         });
 
-        return $archivo->load(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot']);
+        return $file->load(['programa:id,titulo', 'spots:id,id_archivo_parrilla,titulo_spot']);
     }
 
     public function storeParrillaFile(Request $request, MediaQualityCheck $quality)
@@ -1240,9 +1323,11 @@ class PlayoutBmsController extends Controller
             ->whereIn('id', $entries->pluck('file_id')->filter(fn ($id) => str_starts_with($id, 'spot:'))->map(fn ($id) => substr($id, 5)))
             ->get()->keyBy('id');
         $group = (string) Str::uuid();
-        $items = $entries->values()->map(function (array $entry, int $index) use ($stored, $mam, $spots, $title, $group, $data, $program) {
+        $date = Carbon::today(self::TIMEZONE)->toDateString();
+        $items = $entries->values()->map(function (array $entry, int $index) use ($stored, $mam, $spots, $title, $group, $data, $program, $date) {
             [$source, $id] = explode(':', $entry['file_id']);
             $spot = $source === 'spot' ? $spots->get($id) : null;
+            abort_if($source === 'spot' && !$spot?->vigenteEn($date), 422, 'Un spot está fuera de vigencia para la Parrilla de hoy.');
             $file = match ($source) {
                 'archivo' => $stored->get($id),
                 'mam' => $mam->get($id),

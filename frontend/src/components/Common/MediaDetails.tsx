@@ -29,6 +29,7 @@ export function MediaDetails({ file }: { file: CatalogFile }) {
         <div><dt>Audio</dt><dd>{audio ? [audio.codec_name?.toUpperCase(), audio.channels ? `${audio.channels} canales` : '', sampleRate > 0 ? `${sampleRate / 1000} kHz` : ''].filter(Boolean).join(' · ') || 'Sin datos de audio' : video ? 'Sin pista de audio' : 'Sin datos de audio'}</dd></div>
       </dl>
       {observations.length > 0 && <p><strong>Observaciones</strong> · {observations.join(' · ')}</p>}
+      {qc?.operator_note && <p><strong>Observación de Contenidos</strong> · {qc.operator_note.text}</p>}
     </div>
   );
 }

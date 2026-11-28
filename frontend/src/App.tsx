@@ -21,6 +21,7 @@ export function App() {
   const areas = availableBmsAreas(user?.roles ?? []);
   const defaultArea = areas[0];
   const currentDestination = destination && areas.includes(destination.area) ? destination : defaultArea && bmsHome[defaultArea];
+  const stripeReturn = new URLSearchParams(window.location.search).get('stripe');
 
   const go = (target: SearchTarget) => {
     switch (target.screen) {
@@ -40,6 +41,16 @@ export function App() {
         setScreen(target.screen);
     }
   };
+
+  if (stripeReturn === 'return' || stripeReturn === 'cancel') {
+    return <main className="operations-main">
+      <section className="operations-panel">
+        <h1>{stripeReturn === 'return' ? 'Gracias por completar el proceso en Stripe' : 'Volviste desde Stripe Checkout'}</h1>
+        <p>Canal 11 comprobará el estado del cobro directamente con Stripe.</p>
+        <a href={window.location.pathname}>Volver a Canal 11</a>
+      </section>
+    </main>;
+  }
 
   return (
     <div className="operations-shell">

@@ -1,3 +1,4 @@
+import { useToast } from '../../context/ToastContext';
 ﻿import { useEffect, useState } from 'react';
 import { WorkspaceDialog } from '../Common/WorkspaceDialog';
 import { searchCatalogVideos, type CatalogFile } from '../../services/parrillaMedia';
@@ -6,6 +7,7 @@ export function SpotFilePicker({ onSelect, onClose }: {
   onSelect: (file: CatalogFile) => Promise<void>;
   onClose: () => void;
 }) {
+  const notify = useToast();
   const [query, setQuery] = useState('');
   const [files, setFiles] = useState<CatalogFile[]>([]);
   const [searching, setSearching] = useState(true);
@@ -35,6 +37,7 @@ export function SpotFilePicker({ onSelect, onClose }: {
       onClose();
     } catch (err) {
       setError((err as Error).message);
+      notify((err as Error).message, 'error');
     } finally {
       setSaving(false);
     }

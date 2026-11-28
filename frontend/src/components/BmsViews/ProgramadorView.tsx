@@ -1,20 +1,22 @@
+import { useToast } from '../../context/ToastContext';
 import { ScreenVisitCount } from '../Common/ScreenVisitCount';
 import React, { useState, useEffect } from 'react';
 import type { CatalogFile } from '../../services/parrillaMedia';
 import { SpotFilePicker } from './SpotFilePicker';
 import { ProgramCatalog } from './ProgramCatalog';
+import { CobrosPublicitarios } from './CobrosPublicitarios';
 import { bmsApi } from '../../services/bmsApi';
 import type { ProgrammingSection } from '../../navigation';
-import { Layers, Tv, CreditCard, Plus, CheckCircle, QrCode, FileText, UserPlus, Film } from 'lucide-react';
+import { Layers, Tv, CreditCard, Plus, CheckCircle, FileText, UserPlus, Film } from 'lucide-react';
 
 export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionChange: (section: ProgrammingSection) => void }> = ({
   section: activeSubTab, onSectionChange: setActiveSubTab,
 }) => {
+  const notify = useToast();
   const [parrillaHoy, setParrillaHoy] = useState<any>(null);
   const [clientes, setClientes] = useState<any[]>([]);
   const [spots, setSpots] = useState<any[]>([]);
   const [pautas, setPautas] = useState<any[]>([]);
-  const [pagos, setPagos] = useState<any[]>([]);
 
   const [spotAsset, setSpotAsset] = useState<CatalogFile | null>(null);
   const [spotTitle, setSpotTitle] = useState('');
@@ -24,22 +26,19 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
   const [spotFeedback, setSpotFeedback] = useState<{ error: boolean; text: string } | null>(null);
   const selectedSpot = spots.find(spot => String(spot.id) === spotId);
   const eligibleSegments = (parrillaHoy?.items ?? []).filter((item: any) =>
-    !['EMITIDO', 'CANCELADO'].includes(item.estado) && item.media_playout?.event_type !== 'COMMERCIAL');
+    ['PROGRAMADO', 'AJUSTADO'].includes(item.estado) && item.media_playout?.event_type !== 'COMMERCIAL');
 
   const selectSpotFile = async (asset: CatalogFile) => {
     if (spotPicker?.existingId) {
       await bmsApi.linkSpotFile(spotPicker.existingId, Number(asset.id.split(':')[1]));
       await loadData();
-      setSpotFeedback({ error: false, text: 'Video aprobado vinculado al spot.' });
+      notify('Video aprobado vinculado al spot.');
       return;
     }
 
     setSpotAsset(asset);
     setSpotTitle(previous => previous || asset.titulo.slice(0, 150));
   };
-
-  // Modal QR PagoFacil
-  const [qrModal, setQrModal] = useState<{ open: boolean; txId: string; qrImg: string; monto: number; concepto: string } | null>(null);
 
   useEffect(() => {
     setSpotFeedback(null);
@@ -63,16 +62,9 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
         setPautas(pt);
         setParrillaHoy(ph);
         setSpots(sp);
-      } else if (activeSubTab === 'pagos') {
-        const pg = await bmsApi.getPagos();
-        setPagos(pg);
       }
     } catch (e) {
-      if (activeSubTab === 'spots' || activeSubTab === 'pautas') {
-        setSpotFeedback({ error: true, text: (e as Error).message });
-      } else {
-        console.error(e);
-      }
+      notify((e as Error).message, 'error');
     }
   };
 
@@ -113,7 +105,7 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
           onClick={() => setActiveSubTab('pagos')}
         >
           <CreditCard size={15} />
-          <span>Cobros y QR PagoFacil</span>
+          <span>Cobros publicitarios</span>
         </button>
       </div>
 
@@ -143,11 +135,14 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                     email: (form.elements.namedItem('email') as HTMLInputElement).value,
                     telefono: (form.elements.namedItem('tel') as HTMLInputElement).value
                   };
-                  const res = await bmsApi.createCliente(body);
-                  if (res.success || res.cliente) {
-                    alert('Cliente publicitario registrado exitosamente.');
+                  try {
+                    const res = await bmsApi.createCliente(body);
+                    if (!res.success && !res.cliente) throw new Error(res.message || 'No se pudo registrar el cliente.');
+                    notify(`Cliente «${body.razon_social}» agregado.`);
                     form.reset();
-                    loadData();
+                    void loadData();
+                  } catch (err) {
+                    notify((err as Error).message, 'error');
                   }
                 }}
               >
@@ -243,14 +238,17 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                       ...body,
                       duracion_segundos: spotAsset ? Math.max(1, Math.round(spotAsset.duracion_ms / 1000)) : body.duracion_segundos,
                       id_archivo_parrilla: spotAsset ? Number(spotAsset.id.split(':')[1]) : null,
+                      fecha_vigencia_inicio: String(new FormData(form).get('start') || '') || null,
+                      fecha_vigencia_fin: String(new FormData(form).get('end') || '') || null,
                     });
                     form.reset();
                     setSpotAsset(null);
                     setSpotTitle('');
                     await loadData();
-                    setSpotFeedback({ error: false, text: 'Spot guardado.' });
+                    notify('Spot guardado.');
                   } catch (err) {
                     setSpotFeedback({ error: true, text: (err as Error).message });
+                    notify((err as Error).message, 'error');
                   } finally {
                     setSpotBusy(false);
                   }
@@ -273,10 +271,12 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                     <label>Duracion en Segundos (Auto-detectada)</label>
                     <input id="spot-duracion-input" name="duracion" type="number" min={1} required defaultValue={spotAsset ? Math.max(1, Math.round(spotAsset.duracion_ms / 1000)) : 30} key={spotAsset?.id ?? 'manual'} readOnly={Boolean(spotAsset)} />
                   </div>
+                  <label className="bms-form-group">Inicio de vigencia<input name="start" type="date" /><small>Por defecto, hoy en Bolivia.</small></label>
+                  <label className="bms-form-group">Fin de vigencia<input name="end" type="date" /><small>Por defecto, seis meses desde el inicio.</small></label>
                 </div>
                 <button type="submit" className="bms-btn-primary" disabled={spotBusy}>
                   <Plus size={14} />
-                  <span>Guardar Spot Comercial en BD</span>
+                  <span>Guardar spot</span>
                 </button>
               </form>
             </div>
@@ -316,7 +316,7 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
           <div className="fade-in">
             <div className="bms-card">
               <h3 className="bms-card-title">Pautar spot</h3>
-              <p className="bms-text-muted">Elige el segmento y en qu? momento debe reproducirse el spot.</p>
+              <p className="bms-text-muted">Cada pauta programa un pase del spot antes o después de un segmento. Para un corte intermedio, pauta el spot entre dos segmentos del programa.</p>
               {spotFeedback && <p role={spotFeedback.error ? 'alert' : 'status'} className={spotFeedback.error ? 'operations-error' : undefined}>{spotFeedback.text}</p>}
               {!eligibleSegments.length && <p>Agrega un segmento en la Parrilla de hoy para poder pautar un spot.</p>}
               <form onSubmit={async event => {
@@ -331,9 +331,10 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                     tanda_bloque: String(form.get('tanda')),
                   });
                   await loadData();
-                  setSpotFeedback({ error: false, text: 'Spot agregado a la secuencia de la Parrilla.' });
+                  notify('Pase publicitario agregado a la Parrilla.');
                 } catch (err) {
                   setSpotFeedback({ error: true, text: (err as Error).message });
+                    notify((err as Error).message, 'error');
                 } finally {
                   setSpotBusy(false);
                 }
@@ -358,9 +359,9 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                     </select>
                   </label>
                   <label className="bms-form-group">Momento de salida
-                    <select name="tanda" defaultValue="CORTE_1">
+                    <select name="tanda" defaultValue="FIN_PROGRAMA">
                       <option value="INICIO_PROGRAMA">Antes del segmento</option>
-                      <option value="CORTE_1">Despu?s del segmento</option>
+                      <option value="FIN_PROGRAMA">Después del segmento</option>
                     </select>
                   </label>
                 </div>
@@ -395,7 +396,7 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
                         <td><strong>{pt.item_parrilla?.hora_inicio} - {pt.item_parrilla?.media_playout?.title ?? pt.item_parrilla?.programa?.titulo}</strong></td>
                         <td>{pt.spot?.titulo_spot}</td>
                         <td>{pt.spot?.cliente?.razon_social}</td>
-                        <td><span className="bms-pill-badge bms-badge-blue">{pt.tanda_bloque === 'INICIO_PROGRAMA' ? 'Antes del segmento' : 'Despu?s del segmento'}</span></td>
+                        <td><span className="bms-pill-badge bms-badge-blue">{pt.tanda_bloque === 'INICIO_PROGRAMA' ? 'Antes del segmento' : 'Después del segmento'}</span></td>
                         <td>#{pt.orden}</td>
                         <td><span className="bms-status-indicator status-ok">{pt.estado}</span></td>
                       </tr>
@@ -407,139 +408,8 @@ export const ProgramadorView: React.FC<{ section: ProgrammingSection; onSectionC
           </div>
         )}
 
-        {/* PAGOS PAGOFACIL */}
-        {activeSubTab === 'pagos' && (
-          <div className="fade-in">
-            <div className="bms-card">
-              <h3 className="bms-card-title">Generar Cobro QR PagoFacil (Comercial / Spot)</h3>
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const form = e.target as HTMLFormElement;
-                  const body = {
-                    id_cliente: Number((form.elements.namedItem('cliente') as HTMLSelectElement).value),
-                    monto: Number((form.elements.namedItem('monto') as HTMLInputElement).value),
-                    concepto: (form.elements.namedItem('concepto') as HTMLInputElement).value
-                  };
-                  try {
-                    const res = await bmsApi.generarPagoQr(body);
-                    if (res.success) {
-                      setQrModal({
-                        open: true,
-                        txId: res.transaccionId,
-                        qrImg: res.qrBase64,
-                        monto: body.monto,
-                        concepto: body.concepto
-                      });
-                      loadData();
-                    }
-                  } catch (err: any) {
-                    alert('Error al generar QR: ' + err.message);
-                  }
-                }}
-              >
-                <div className="bms-form-grid">
-                  <div className="bms-form-group">
-                    <label>Cliente Publicitario</label>
-                    <select name="cliente" required>
-                      {clientes.map((c) => (
-                        <option key={c.id} value={c.id}>{c.razon_social}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="bms-form-group">
-                    <label>Monto a Cobrar (BOB)</label>
-                    <input name="monto" type="number" step="0.5" required defaultValue="500" />
-                  </div>
-                  <div className="bms-form-group" style={{ gridColumn: 'span 2' }}>
-                    <label>Concepto del Pago</label>
-                    <input name="concepto" required placeholder="Pauta publicitaria paquete 30 pases" />
-                  </div>
-                </div>
-                <button type="submit" className="bms-btn-primary">
-                  <QrCode size={14} />
-                  <span>Generar Codigo QR de Pago</span>
-                </button>
-              </form>
-            </div>
-
-            <div className="bms-card">
-              <h3 className="bms-card-title">Historial de Cobros y Conciliaciones PagoFacil</h3>
-              <div className="bms-table-container">
-                <table className="bms-table">
-                  <thead>
-                    <tr>
-                      <th>Transaccion ID</th>
-                      <th>Cliente</th>
-                      <th>Concepto</th>
-                      <th>Monto</th>
-                      <th>Estado</th>
-                      <th>Accion</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pagos.map((p) => (
-                      <tr key={p.id}>
-                        <td><code>{p.transaccion_id}</code></td>
-                        <td><strong>{p.cliente?.razon_social || 'N/A'}</strong></td>
-                        <td>{p.concepto}</td>
-                        <td><strong className="accent-green">Bs. {p.monto}</strong></td>
-                        <td>
-                          <span className={`bms-status-indicator ${p.estado === 'PAGADO' ? 'status-ok' : 'status-ready'}`}>
-                            {p.estado}
-                          </span>
-                        </td>
-                        <td>
-                          {p.estado === 'PENDIENTE' && (
-                            <button
-                              className="bms-btn-secondary"
-                              onClick={async () => {
-                                await bmsApi.confirmarPago(p.transaccion_id);
-                                alert('Pago confirmado con exito.');
-                                loadData();
-                              }}
-                            >
-                              Simular Confirmacion
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeSubTab === 'pagos' && <CobrosPublicitarios />}
       </div>
-
-      {/* Modal QR PagoFacil */}
-      {qrModal && qrModal.open && (
-        <div className="config-modal-backdrop" onClick={() => setQrModal(null)}>
-          <div className="config-modal-card" style={{ maxWidth: 360, textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ margin: '0 0 8px' }}>Escanear QR de PagoFacil</h3>
-            <p className="bms-text-muted" style={{ fontSize: '0.8276rem' }}>{qrModal.concepto}</p>
-            <div style={{ background: '#fff', padding: 12, borderRadius: 12, display: 'inline-block', margin: '14px 0' }}>
-              <img src={qrModal.qrImg} alt="QR" style={{ width: 180, height: 180 }} />
-            </div>
-            <div style={{ fontSize: '1.241rem', fontWeight: 800, color: 'var(--color-success)', marginBottom: 12 }}>
-              Bs. {qrModal.monto}
-            </div>
-            <button
-              className="bms-btn-primary"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={async () => {
-                await bmsApi.confirmarPago(qrModal.txId);
-                alert('Pago confirmado exitosamente via Webhook PagoFacil.');
-                setQrModal(null);
-                loadData();
-              }}
-            >
-              Simular Pago Exitoso
-            </button>
-          </div>
-        </div>
-      )}
       {spotPicker && <SpotFilePicker onSelect={selectSpotFile} onClose={() => setSpotPicker(null)} />}
     </div>
   );

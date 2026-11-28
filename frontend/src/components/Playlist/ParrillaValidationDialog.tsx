@@ -2,6 +2,7 @@
 import { WorkspaceDialog } from '../Common/WorkspaceDialog';
 import { requestJson } from '../../services/api/client';
 import { mediaHeaders } from '../../services/parrillaMedia';
+import { useToast } from '../../context/ToastContext';
 
 interface ValidationResult {
   pending: number;
@@ -10,6 +11,7 @@ interface ValidationResult {
 }
 
 export function ParrillaValidationDialog({ onClose }: { onClose: () => void }) {
+  const notify = useToast();
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -17,10 +19,16 @@ export function ParrillaValidationDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const controller = new AbortController();
     requestJson<ValidationResult>('/api/parrilla/validacion', { headers: mediaHeaders(), signal: controller.signal })
-      .then(data => { if (!controller.signal.aborted) setResult(data); })
-      .catch(err => { if (!controller.signal.aborted) setError(err.message); });
+      .then(data => {
+        if (controller.signal.aborted) return;
+        setResult(data);
+        const findings = data.errors.length + data.warnings.length;
+        notify(findings ? `Parrilla revisada · ${data.errors.length} errores y ${data.warnings.length} avisos.` : 'Parrilla revisada sin hallazgos.',
+          findings ? 'warning' : 'success');
+      })
+      .catch(err => { if (!controller.signal.aborted) { setError(err.message); notify(err.message, 'error'); } });
     return () => controller.abort();
-  }, [revision]);
+  }, [notify, revision]);
 
   return (
     <WorkspaceDialog title="Validar Parrilla de hoy" description="Comprueba los bloques pendientes, sus archivos y los cruces de horario." onClose={onClose}>

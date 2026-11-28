@@ -35,4 +35,15 @@ return [
         ],
     ],
 
+    'stripe' => [
+        'secret' => env('STRIPE_SECRET_KEY'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'price_id' => env('STRIPE_PRICE_ID', 'price_...'),
+        'domain' => env('STRIPE_CHECKOUT_DOMAIN', 'http://localhost:5173'),
+    ],
+
+    'pagofacil' => [
+        'paid_status' => env('PAGOFACIL_PAID_STATUS'),
+    ],
+
 ];

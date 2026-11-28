@@ -7,6 +7,7 @@ use App\Models\ClientePublicitario;
 use App\Models\SpotPublicitario;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 
@@ -125,7 +126,7 @@ class PagoFacilService
         $emailCliente = $cliente ? ($cliente->email ?? 'contacto@empresa.bo') : 'contacto@empresa.bo';
 
         // paymentNumber único del comercio
-        $paymentNumber = 'VENTA-' . str_pad((string)(Pago::count() + 1), 6, '0', STR_PAD_LEFT);
+        $paymentNumber = 'VENTA-' . Str::ulid();
         $clientCode = $cliente ? ('CLI-' . str_pad((string)$cliente->id, 5, '0', STR_PAD_LEFT)) : 'CLI-00001';
 
         // Intentar llamada a PagoFácil API
@@ -178,13 +179,8 @@ class PagoFacilService
             } catch (\Throwable $e) {}
         }
 
-        // Si la pasarela está en entorno de desarrollo/demo o no devuelve QR en vivo,
-        // generamos el Base64 estándar de un QR para pruebas inmediatas sin bloqueo
-        $qrCadena = "PAGOFACIL|{$paymentNumber}|{$monto}|{$moneda}|" . urlencode($concepto);
-        if (!$qrBase64) {
-            $qrSvg = "https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=" . urlencode($qrCadena);
-            $qrBase64 = $qrSvg;
-        } elseif (!str_starts_with($qrBase64, 'data:') && !str_starts_with($qrBase64, 'http')) {
+        abort_unless($qrBase64 && $pfTransactionId, 502, 'PagoFácil no generó un QR válido.');
+        if (!str_starts_with($qrBase64, 'data:') && !str_starts_with($qrBase64, 'http')) {
             $qrBase64 = 'data:image/png;base64,' . $qrBase64;
         }
 
@@ -199,7 +195,7 @@ class PagoFacilService
             'estado' => 'PENDIENTE',
             'transaccion_id' => $paymentNumber,
             'qr_imagen' => $qrBase64,
-            'qr_cadena' => $qrCadena,
+            'qr_cadena' => null,
             'fecha_transaccion' => Carbon::now(),
             'datos_adicionales' => [
                 'pagofacil_transaction_id' => $pfTransactionId,
@@ -228,82 +224,46 @@ class PagoFacilService
      */
     public function queryTransaction(string $transactionId): array
     {
+        $pago = Pago::where('metodo_pago', 'QR_PAGOFACIL')->where('transaccion_id', $transactionId)->firstOrFail();
+        $providerId = $pago->datos_adicionales['pagofacil_transaction_id'] ?? null;
+        abort_unless($providerId, 409, 'El cobro no tiene una transacción verificable de PagoFácil.');
         $token = $this->login();
-        if ($token) {
-            try {
-                $payload = is_numeric($transactionId)
-                    ? ['pagofacilTransactionId' => (int)$transactionId]
-                    : ['companyTransactionId' => $transactionId];
+        abort_unless($token, 502, 'No se pudo conectar con PagoFácil.');
 
-                $res = Http::withHeaders([
-                    'Authorization' => "Bearer {$token}",
-                    'Content-Type' => 'application/json',
-                    'Response-Language' => 'es'
-                ])->timeout(8)->post("{$this->baseUrl}/query-transaction", $payload);
-
-                if ($res->successful() && $res->json('error') === 0) {
-                    $vals = $res->json('values') ?? [];
-                    // Si el estado en PagoFacil indica pagado, actualizar orden local
-                    if (isset($vals['paymentStatus']) && in_array($vals['paymentStatus'], [1, '1', 'PAGADO', 'COMPLETADO'])) {
-                        $this->confirmarPago($transactionId, $vals);
-                    }
-                    return $vals;
-                }
-            } catch (\Throwable $e) {}
+        try {
+            $response = Http::withToken($token)->acceptJson()->timeout(8)
+                ->post("{$this->baseUrl}/query-transaction", ['companyTransactionId' => $transactionId]);
+        } catch (\Illuminate\Http\Client\ConnectionException) {
+            abort(502, 'No se pudo verificar el cobro con PagoFácil.');
+        }
+        abort_unless($response->successful() && $response->json('error') === 0 && is_array($response->json('values')),
+            502, 'PagoFácil no pudo verificar el cobro.');
+        $details = $response->json('values');
+        $paidStatus = config('services.pagofacil.paid_status');
+        if ($paidStatus !== null && $paidStatus !== '' && isset($details['paymentStatus'])
+            && (string) $details['paymentStatus'] === (string) $paidStatus) {
+            abort_unless(($details['companyTransactionId'] ?? null) === $transactionId
+                && (string) ($details['pagofacilTransactionId'] ?? '') === (string) $providerId
+                && (string) ($details['currencyId'] ?? '') === '2'
+                && is_numeric($details['amount'] ?? null)
+                && (int) round((float) $details['amount'] * 100) === (int) round($pago->monto * 100),
+                409, 'Los datos del pago no coinciden con el cobro registrado.');
+            DB::transaction(function () use ($pago) {
+                Pago::whereKey($pago->id)->where('estado', 'PENDIENTE')->update(['estado' => 'PAGADO', 'fecha_pago' => now()]);
+            });
         }
 
-        $local = Pago::where('transaccion_id', $transactionId)->first();
-        return [
-            'companyTransactionId' => $transactionId,
-            'paymentStatus' => $local && $local->estado === 'PAGADO' ? 1 : 0,
-            'amount' => $local ? (string)$local->monto : '0.00',
-            'status' => $local ? $local->estado : 'NO_ENCONTRADO'
-        ];
+        return $details;
     }
 
-    /**
-     * Paso 5: Manejo del Callback Webhook Notificación de Pago (POST de PagoFácil)
-     * Parámetros recibidos: PedidoID, Fecha, Hora, MetodoPago, Estado
-     * Respuesta requerida: HTTP 200 { error: 0, status: 1, message: "Notificación recibida", values: true }
-     */
     public function handleCallback(array $callbackData): array
     {
-        $pedidoId = $callbackData['PedidoID'] ?? $callbackData['pedidoId'] ?? null;
-        if ($pedidoId) {
-            $pago = Pago::where('transaccion_id', $pedidoId)->first();
-            if ($pago) {
-                $pago->estado = 'PAGADO';
-                $pago->fecha_pago = Carbon::now();
-                $pago->datos_adicionales = array_merge($pago->datos_adicionales ?? [], [
-                    'callback_data' => $callbackData,
-                    'fecha_confirmacion' => Carbon::now()->toDateTimeString()
-                ]);
-                $pago->save();
-            }
+        $reference = $callbackData['PedidoID'] ?? $callbackData['pedidoId'] ?? null;
+        if (is_string($reference) && Pago::where('metodo_pago', 'QR_PAGOFACIL')->where('estado', 'PENDIENTE')
+            ->where('transaccion_id', $reference)->exists()) {
+            $this->queryTransaction($reference);
         }
 
-        return [
-            'error' => 0,
-            'status' => 1,
-            'message' => 'Notificación recibida',
-            'values' => true
-        ];
-    }
-
-    /**
-     * Confirmación manual o de simulación local
-     */
-    public function confirmarPago(string $transaccionId, array $datosPasarela = []): Pago
-    {
-        $pago = Pago::where('transaccion_id', $transaccionId)->firstOrFail();
-        $pago->estado = 'PAGADO';
-        $pago->fecha_pago = Carbon::now();
-        $pago->datos_adicionales = array_merge($pago->datos_adicionales ?? [], [
-            'callback_confirmado' => Carbon::now()->toDateTimeString(),
-            'pasarela_response' => $datosPasarela
-        ]);
-        $pago->save();
-
-        return $pago;
+        return ['error' => 0, 'status' => 1, 'message' => 'Notificación recibida', 'values' => true];
     }
 }

@@ -176,10 +176,10 @@ export const bmsApi = {
     return res.json();
   },
   getSpots: async () => requestJson<any[]>(`${BASE_URL}/v1/spots`),
-  createSpot: async (data: { id_cliente: number; titulo_spot: string; duracion_segundos: number; id_archivo_parrilla: number | null }) =>
+  createSpot: async (data: { id_cliente: number; titulo_spot: string; duracion_segundos: number; id_archivo_parrilla: number | null; fecha_vigencia_inicio?: string | null; fecha_vigencia_fin?: string | null }) =>
     requestJson(`${BASE_URL}/v1/spots`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data),
     }),
   getPautas: async () => requestJson<any[]>(`${BASE_URL}/v1/pautas`),
@@ -211,21 +211,22 @@ export const bmsApi = {
   getReporteGeneral: async () => (await fetch(`${LARAVEL_API}/v1/reportes/general`)).json(),
 
   // Módulo PagoFácil QR
-  getPagos: async () => (await fetch(`${LARAVEL_API}/pagos`)).json(),
-  generarPagoQr: async (data: any) => {
-    const res = await fetch(`${LARAVEL_API}/pagos/generar-qr`, {
+  getPagos: () => requestJson<any[]>(`${BASE_URL}/pagos`, { headers: adminHeaders() }),
+  generarPagoQr: (data: { id_cliente: number; id_spot?: number | null; monto: number; concepto: string }) =>
+    requestJson<{ success: boolean; transaccion_id: string; qrBase64: string; qr_imagen: string; monto: number }>(`${BASE_URL}/pagos/generar-qr`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: adminHeaders(),
       body: JSON.stringify(data)
-    });
-    return res.json();
-  },
-  confirmarPago: async (txId: string) => {
-    const res = await fetch(`${LARAVEL_API}/pagos/confirmar/${txId}`, {
+    }),
+  generarStripeCheckout: (data: { id_spot: number; concepto: string; request_id: string }) =>
+    requestJson<{ pago: any }>(`${BASE_URL}/pagos/stripe/checkout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: 'PAGADO_CONFIRMADO' })
-    });
-    return res.json();
-  }
+      headers: adminHeaders(),
+      body: JSON.stringify(data)
+    }),
+  confirmarPago: (txId: string) =>
+    requestJson<{ success: boolean; pago: any }>(`${BASE_URL}/pagos/confirmar/${encodeURIComponent(txId)}`, {
+      method: 'POST',
+      headers: adminHeaders(),
+    }),
 };

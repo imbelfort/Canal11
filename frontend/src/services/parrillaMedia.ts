@@ -2,7 +2,7 @@ import { requestJson } from './api/client';
 
 export interface MediaQuality {
   status: 'APROBADO_TECNICO' | 'OBSERVADO' | 'PENDIENTE';
-  checked_at: string;
+  checked_at?: string;
   issues: string[];
   duration_ms?: number;
   size_bytes?: number;
@@ -11,11 +11,12 @@ export interface MediaQuality {
   bit_rate?: number | null;
   video?: { codec_name?: string; width?: number; height?: number; avg_frame_rate?: string; bit_rate?: string } | null;
   audio?: { codec_name?: string; channels?: number; sample_rate?: string } | null;
+  operator_note?: { text: string; author: string; updated_at: string };
 }
 
 export const qualityLabels = {
   APROBADO_TECNICO: 'Aprobado técnico',
-  OBSERVADO: 'Rechazado',
+  OBSERVADO: 'Observado',
   PENDIENTE: 'Pendiente',
 };
 

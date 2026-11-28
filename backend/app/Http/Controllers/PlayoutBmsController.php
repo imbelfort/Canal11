@@ -268,7 +268,7 @@ class PlayoutBmsController extends Controller
         $cat = CategoriaPrograma::create($request->validate([
             'nombre' => 'required|string|max:100|unique:categoria_programa,nombre',
             'descripcion' => 'nullable|string'
-        ], ['nombre.unique' => 'Ya existe una categoria con ese nombre. Seleccionala en la lista.']));
+        ], ['nombre.unique' => 'Ya existe una categoria con ese nombre. Seleccionala en la lista.']) + ['estado' => 'ACTIVO']);
         return response()->json(['success' => true, 'categoria' => $cat]);
     }
 
@@ -1155,7 +1155,7 @@ class PlayoutBmsController extends Controller
             'video' => 'required|file|mimetypes:video/mp4,video/webm,video/ogg|max:512000',
             'title' => 'required|string|max:255',
             'duration_ms' => 'nullable|integer|min:1|max:86400000',
-            'program_id' => 'nullable|integer|exists:programa,id,estado,ACTIVO',
+            'program_id' => 'nullable|integer|exists:programa,id',
         ]);
         $path = $data['video']->store('parrilla', 'local');
         abort_unless($path, 500, 'No se pudo guardar el video.');
@@ -1217,8 +1217,8 @@ class PlayoutBmsController extends Controller
     {
         abort_unless($request->user('sanctum')?->canScheduleParrilla(), 403, 'Solo Programación y Administración pueden armar la Parrilla.');
         $data = $request->validate([
-            'program_title' => 'nullable|string|max:200',
-            'program_id' => 'nullable|integer|exists:programa,id',
+            'program_title' => 'nullable|required_without:program_id|string|max:200',
+            'program_id' => 'nullable|integer|exists:programa,id,estado,ACTIVO',
             'scheduled_time' => 'nullable|date_format:H:i',
             'entries' => 'required|array|min:1|max:100',
             'entries.*.file_id' => ['required', 'regex:/^(archivo|mam|spot):[1-9][0-9]{0,17}$/'],
@@ -1228,7 +1228,7 @@ class PlayoutBmsController extends Controller
         $program = isset($data['program_id']) ? Programa::findOrFail($data['program_id']) : null;
         $title = $program?->titulo ?? $data['program_title'] ?? null;
         $entries = collect($data['entries']);
-        abort_if($title && !$entries->contains(fn ($entry) => $entry['event_type'] === 'VIDEO' && !str_starts_with($entry['file_id'], 'spot:')), 422,
+        abort_if($program && !$entries->contains(fn ($entry) => $entry['event_type'] === 'VIDEO' && !str_starts_with($entry['file_id'], 'spot:')), 422,
             'Agrega al menos un segmento de programa.');
         $stored = ArchivoParrilla::query()
             ->whereIn('id', $entries->pluck('file_id')->filter(fn ($id) => str_starts_with($id, 'archivo:'))->map(fn ($id) => substr($id, 8)))

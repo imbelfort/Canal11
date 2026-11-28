@@ -38,7 +38,7 @@ export function ProgramCatalog() {
     setEditing(false);
     setQuery('');
     setFilter('');
-    setNotice(`?${program.titulo}? ya est? disponible en Parrilla.`);
+    setNotice(`«${program.titulo}» ya está disponible en Parrilla.`);
   };
 
   const search = query.trim().toLocaleLowerCase();
@@ -73,7 +73,7 @@ export function ProgramCatalog() {
       {loading ? <p role="status">Cargando programas…</p> : !loadError && (
         visible.length ? <div className="bms-table-container">
           <table className="bms-table">
-            <thead><tr><th>Programa</th><th>Categoría</th><th>Duración habitual</th><th>Estado</th><th>Materiales</th></tr></thead>
+            <thead><tr><th>Programa</th><th>Categoría</th><th>Clasificación</th><th>Origen</th><th>Duración habitual</th><th>Estado</th><th>Materiales</th></tr></thead>
             <tbody>{visible.map(program => (
               <tr key={program.id}>
                 <td><strong>{program.titulo}</strong><small>{program.codigo}{program.descripcion ? ` · ${program.descripcion}` : ''}</small></td>

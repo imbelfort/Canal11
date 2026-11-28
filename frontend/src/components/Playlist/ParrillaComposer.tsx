@@ -46,6 +46,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
   const [error, setError] = useState('');
   const [catalogError, setCatalogError] = useState('');
   const [programError, setProgramError] = useState('');
+  const [programFilesError, setProgramFilesError] = useState('');
   const [spotError, setSpotError] = useState('');
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [clock, setClock] = useState(() => secondsOfDay(boliviaClock.format(new Date())));
@@ -61,7 +62,12 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
     const controller = new AbortController();
     const options = { headers: mediaHeaders(), signal: controller.signal };
     bmsApi.getProgramas(controller.signal)
-      .then(items => { if (!controller.signal.aborted) setPrograms(items.filter(item => item.estado === 'ACTIVO')); })
+      .then(items => {
+        if (!controller.signal.aborted) {
+          const active = items.filter(item => item.estado === 'ACTIVO');
+          setPrograms(previous => [...active, ...previous.filter(item => !active.some(program => program.id === item.id))]);
+        }
+      })
       .catch(err => { if (!controller.signal.aborted) setProgramError(err.message); });
     requestJson<Spot[]>('/api/v1/spots', options)
       .then(items => { if (!controller.signal.aborted) setSpots(items); })
@@ -90,6 +96,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
     programRequest.current?.abort();
     setProgramId(id);
     setProgramFiles([]);
+    setProgramFilesError('');
     setLibrary(id ? 'program' : 'videos');
     setQuery('');
     setError('');
@@ -106,7 +113,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
       if (controller.signal.aborted) return;
       setProgramFiles(files);
     } catch (err) {
-      if (!controller.signal.aborted) setError((err as Error).message);
+      if (!controller.signal.aborted) setProgramFilesError((err as Error).message);
     } finally {
       if (!controller.signal.aborted) setLoadingProgram(false);
     }
@@ -161,6 +168,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
     ? programFiles.filter(file => file.titulo.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     : catalog;
   const cuts = entries.filter(entry => entry.eventType === 'COMMERCIAL').length;
+  const segments = entries.length - cuts;
   const start = scheduleMode === 'now' ? clock : schedule ? secondsOfDay(`${schedule}:00`) : null;
   let end = start;
   const timeline = entries.map(entry => {
@@ -181,7 +189,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
   return (
     <WorkspaceDialog wide="full" title="Armar bloque" description="Identifica el bloque, elige el material y comprueba el orden de salida." busy={saving} onClose={onClose}>
       <form className="parrilla-composer workspace-dialog-body" onSubmit={save}>
-        <section className="block-editor-panel block-editor-setup" aria-labelledby="block-setup">
+        <section className="block-editor-panel" aria-labelledby="block-setup">
           <div className="block-editor-heading"><h3 id="block-setup">1. Datos del bloque</h3><span>Señal principal · Hoy</span></div>
           <div className="block-editor-fields">
             <label>Programa
@@ -225,7 +233,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
             </div>
             <input className="block-library-search" type="search" aria-label={library === 'spots' ? 'Buscar spot' : 'Buscar video'} placeholder={library === 'spots' ? 'Buscar spot o anunciante' : 'Buscar video por título'} value={query} maxLength={150} onChange={event => setQuery(event.target.value)} />
             {library !== 'spots' ? <>
-              {library === 'videos' && catalogError && <p role="alert" className="operations-error">{catalogError}</p>}
+              {(library === 'videos' ? catalogError : programFilesError) && <p role="alert" className="operations-error">{library === 'videos' ? catalogError : programFilesError}</p>}
               {(library === 'program' ? loadingProgram : loadingCatalog) ? <p role="status" className="block-empty">Buscando archivos…</p>
                 : !visibleFiles.length ? <p className="block-empty">{library === 'program' && !query ? 'Este programa no tiene archivos vinculados. Puedes elegir material en Videos listos.' : 'No hay videos para esta búsqueda.'}</p>
                 : <ul className="block-media-list">
@@ -266,7 +274,7 @@ export function ParrillaComposer({ published, onSave, onClose }: { published: bo
           </section>
 
           <section className="block-editor-panel" aria-labelledby="block-order">
-            <div className="block-editor-heading"><h3 id="block-order">3. Orden de salida</h3><span>{entries.length - cuts} segmentos · {cuts} cortes</span></div>
+            <div className="block-editor-heading"><h3 id="block-order">3. Orden de salida</h3><span>{segments} {segments === 1 ? 'segmento' : 'segmentos'} · {cuts} {cuts === 1 ? 'corte' : 'cortes'}</span></div>
             {entries.length === 100 && <p role="status">Se alcanzó el límite de 100 elementos por bloque.</p>}
             {!entries.length ? <div className="block-empty block-empty-order">Agrega videos o spots desde la biblioteca. Aquí aparecerá su hora de salida estimada.</div>
               : <div className="block-order-scroll">
